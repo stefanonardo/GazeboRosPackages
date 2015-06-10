@@ -1,0 +1,9 @@
+# Generated files
+
+src/CMakeLists.txt
+
+# Generated directories
+
+build/
+devel/
+install/
