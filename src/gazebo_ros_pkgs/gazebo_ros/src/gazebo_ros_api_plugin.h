@@ -85,6 +85,7 @@
 #include "gazebo_msgs/SetVisualProperties.h"
 #include "gazebo_msgs/GetLightProperties.h"
 #include "gazebo_msgs/SetLightProperties.h"
+#include "gazebo_msgs/ExportWorldSDF.h"
 
 // Topics
 #include "gazebo_msgs/ModelState.h"
@@ -109,6 +110,13 @@
 #include "gazebo_msgs/GetPhysicsProperties.h"
 
 #include <boost/algorithm/string.hpp>
+
+// HBP
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+#include <boost/iostreams/device/mapped_file.hpp>
+#include <string>
+// END HBP
 
 namespace gazebo
 {
@@ -250,7 +258,11 @@ public:
   // patched for HBP
   /// \brief
   bool getLightProperties(gazebo_msgs::GetLightProperties::Request &req, gazebo_msgs::GetLightProperties::Response &res);
-  
+
+  // Patched for HBP
+  /// \brief
+  bool exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req, gazebo_msgs::ExportWorldSDF::Response &res);
+
   // patched for HBP
   /// \brief
   bool setLightProperties(gazebo_msgs::SetLightProperties::Request &req, gazebo_msgs::SetLightProperties::Response &res);
@@ -388,6 +400,8 @@ private:
   gazebo::msgs::Scene gazeboscene_;
   bool scene_update_done_;
 
+  int export_sdf_count_; // HBP
+
   boost::shared_ptr<ros::NodeHandle> nh_;
   ros::CallbackQueue gazebo_queue_;
   boost::shared_ptr<boost::thread> gazebo_callback_queue_thread_;
@@ -431,6 +445,7 @@ private:
   ros::ServiceServer set_object_properties_service_; // patched for HBP
   ros::ServiceServer get_light_properties_service_;  // patched for HBP
   ros::ServiceServer set_light_properties_service_;  // patched for HBP
+  ros::ServiceServer export_world_sdf_service_;  // patched for HBP
   ros::ServiceServer pause_physics_service_;
   ros::ServiceServer unpause_physics_service_;
   ros::ServiceServer clear_joint_forces_service_;

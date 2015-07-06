@@ -31,7 +31,8 @@ GazeboRosApiPlugin::GazeboRosApiPlugin() :
   physics_reconfigure_initialized_(false),
   world_created_(false),
   stop_(false),
-  plugin_loaded_(false)
+  plugin_loaded_(false),
+  export_sdf_count_(0)
 {
   robot_namespace_.clear();
 }
@@ -502,6 +503,16 @@ void GazeboRosApiPlugin::advertiseServices()
                                                           boost::bind(&GazeboRosApiPlugin::setLightProperties,this,_1,_2),
                                                           ros::VoidPtr(), &gazebo_queue_);
   set_light_properties_service_ = nh_->advertiseService(set_light_properties_aso);
+
+  // patched for HBP
+  // Allows SDF export via ROS
+  std::string export_world_sdf_service_name("export_world_sdf");
+  ros::AdvertiseServiceOptions export_world_sdf_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::ExportWorldSDF>(
+                                                          export_world_sdf_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::exportWorldSDF,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  export_world_sdf_service_ = nh_->advertiseService(export_world_sdf_aso);
 
   // Advertise more services on the custom queue
   std::string pause_physics_service_name("pause_physics");
@@ -1720,6 +1731,29 @@ bool GazeboRosApiPlugin::setLightProperties(gazebo_msgs::SetLightProperties::Req
 
   res.success = false;
   res.status_message = std::string("setLightProperties: Requested light ") + req.light_name + std::string(" not found!");
+
+  return true;
+}
+
+// patched for HBP
+bool GazeboRosApiPlugin::exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req, gazebo_msgs::ExportWorldSDF::Response &res) { 
+  res.sdf_dump = "";
+  if (this->world_ == NULL) return false;
+
+  int i = __sync_fetch_and_add(&(this->export_sdf_count_), 1);
+  std::string fname = std::string("/tmp/export_sdf_") + boost::str(boost::format("%d") % i);
+
+  this->world_->Save(fname);
+
+  try {
+    boost::filesystem::path fpath(fname);
+    boost::iostreams::mapped_file fmap(fpath);
+    res.sdf_dump = std::string(fmap.data());
+    boost::filesystem::remove(fname);
+  }
+  catch (...) {
+    return false;
+  }
 
   return true;
 }
