@@ -54,6 +54,7 @@ add_service_files(
    StartNewSimulation.srv
    GetSimulationState.srv
    GetVersion.srv
+   GetTransferFunctions.srv
 )
 
 ## Generate actions in the 'action' folder
