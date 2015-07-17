@@ -1,7 +1,12 @@
-# This file shouldn't exist
 src/CMakeLists.txt
 
 # Generated directories
 
 catkin_ws/
 build_venv/
+build/
+devel/
+install/
+
+# hidden files and dirs
+.*
