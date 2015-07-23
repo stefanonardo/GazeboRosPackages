@@ -1,4 +1,4 @@
-string transfer_function_original_name
+string transfer_function_name
 string transfer_function_source
 ---
 bool success
