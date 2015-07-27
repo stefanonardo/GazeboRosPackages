@@ -24,7 +24,7 @@ namespace gazebo
       // simulation iteration.
       this->updateConnection = event::Events::ConnectWorldUpdateBegin(
           boost::bind(&Init_iCub::OnUpdate, this, _1));
-      
+
       // control method
       if (!_sdf->HasElement("control_method"))
       {
@@ -44,7 +44,7 @@ namespace gazebo
         std::cout << "Wrong value for the parameter <control_method> in icub_initialization, default to position" << std::endl;
         this->startingPolicy = true;
       }
-      
+
       common::PID posPID = this->jointControl->GetPositionPIDs().at(this->model->GetName() + "::torso_yaw");
       common::PID velPID = this->jointControl->GetVelocityPIDs().at(this->model->GetName() + "::torso_yaw");
 
@@ -59,14 +59,14 @@ namespace gazebo
       posPID.SetIMin(-10.0);
       velPID.SetIMax(10.0);
       velPID.SetIMin(-10.0);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::torso_yaw", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::torso_yaw", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::torso_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::torso_roll", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::torso_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::torso_pitch", common::PID(velPID));
-      
+
       //Head
       posPID.SetPGain(50.0);
       posPID.SetIGain(7.0);
@@ -74,35 +74,35 @@ namespace gazebo
       velPID.SetPGain(50);
       velPID.SetIGain(50.0);
       velPID.SetDGain(0.0005);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::neck_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::neck_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::neck_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::neck_roll", common::PID(velPID));
-      
+
       velPID.SetPGain(12);
       velPID.SetIGain(10.0);
       velPID.SetDGain(0.0001);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::neck_yaw", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::neck_yaw", common::PID(velPID));
-      
+
       velPID.SetPGain(0.0);
       velPID.SetIGain(2.0);
       velPID.SetDGain(0.01);
 
       this->jointControl->SetPositionPID(this->model->GetName() + "::eye_tilt", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::eye_tilt", common::PID(velPID));
-      
+
       velPID.SetPGain(2.0);
       velPID.SetIGain(0.1);
       velPID.SetDGain(0.003);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::left_eye_pan", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::left_eye_pan", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::right_eye_pan", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::right_eye_pan", common::PID(velPID));
-      
+
       //left leg
       posPID.SetPGain(1000.0);
       posPID.SetIGain(10.0);
@@ -110,7 +110,7 @@ namespace gazebo
       velPID.SetPGain(500.0);
       velPID.SetIGain(20.0);
       velPID.SetDGain(10.1);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_hip_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_hip_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_hip_roll", common::PID(posPID));
@@ -123,7 +123,7 @@ namespace gazebo
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_ankle_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_ankle_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_ankle_roll", common::PID(velPID));
-      
+
       //right leg
       posPID.SetPGain(1000.0);
       posPID.SetIGain(10.0);
@@ -131,7 +131,7 @@ namespace gazebo
       velPID.SetPGain(500.0);
       velPID.SetIGain(20.0);
       velPID.SetDGain(10.1);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_hip_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_hip_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_hip_roll", common::PID(posPID));
@@ -144,7 +144,7 @@ namespace gazebo
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_ankle_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_ankle_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_ankle_roll", common::PID(velPID));
-      
+
       //left arm
       posPID.SetPGain(100.0);
       posPID.SetIGain(10.0);
@@ -152,18 +152,18 @@ namespace gazebo
       velPID.SetPGain(500.0);
       velPID.SetIGain(2.0);
       velPID.SetDGain(0.1);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_shoulder_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_shoulder_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_shoulder_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_shoulder_roll", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_shoulder_yaw", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_shoulder_yaw", common::PID(velPID));
-      
+
       velPID.SetPGain(300.0);
       velPID.SetIGain(0.1);
       velPID.SetDGain(0.01);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_elbow", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::l_elbow", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::l_wrist_prosup", common::PID(posPID));
@@ -180,18 +180,18 @@ namespace gazebo
       velPID.SetPGain(500.0);
       velPID.SetIGain(2.0);
       velPID.SetDGain(0.1);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_shoulder_pitch", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_shoulder_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_shoulder_roll", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_shoulder_roll", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_shoulder_yaw", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_shoulder_yaw", common::PID(velPID));
-      
+
       velPID.SetPGain(300.0);
       velPID.SetIGain(0.1);
       velPID.SetDGain(0.01);
-      
+
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_elbow", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_elbow", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_wrist_prosup", common::PID(posPID));
@@ -200,7 +200,7 @@ namespace gazebo
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_wrist_pitch", common::PID(velPID));
       this->jointControl->SetPositionPID(this->model->GetName() + "::r_wrist_yaw", common::PID(posPID));
       this->jointControl->SetVelocityPID(this->model->GetName() + "::r_wrist_yaw", common::PID(velPID));
-      
+
       if (this->startingPolicy)
       {
         for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
@@ -240,16 +240,16 @@ namespace gazebo
     }
 
     // Pointer to the model
-  private: 
+  private:
     physics::ModelPtr model;
     event::ConnectionPtr updateConnection;
     gazebo::physics::JointControllerPtr jointControl;
     std::map<std::string, gazebo::physics::JointPtr> joints;
-    
+
     // control method
     bool startingPolicy;
   };
 
   // Register this plugin with the simulator
   GZ_REGISTER_MODEL_PLUGIN(Init_iCub)
-} 
+}

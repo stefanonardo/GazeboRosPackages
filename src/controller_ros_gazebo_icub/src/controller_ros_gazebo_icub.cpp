@@ -14,10 +14,10 @@
 using namespace std;
 
 namespace gazebo
-{  
+{
   class ROSController_iCub : public ModelPlugin
   {
-  public: 
+  public:
     void callbackpos(const std_msgs::Float64::ConstPtr &msg, const std::string &jointId) {
       // control method
       string jointNameCtrl1 = jointId;
@@ -34,9 +34,9 @@ namespace gazebo
       if (findIt != velocities.end())
       {
         cout << "CHANGED CONTROL POLICY JOINT " << jointId << endl;
-        
+
         this->jointControl->Reset();
-        
+
         cout << "POSITIONS:" << endl;
         for (std::map<std::string, double>::iterator it = positions.begin(); it != positions.end(); ++it)
         {
@@ -57,8 +57,8 @@ namespace gazebo
           }
           cout << it->first << " " << positions[it->first] << endl;
         }
-      }  
-        
+      }
+
       double command = msg->data / this->DegOrRad;
       if (jointId == this->model->GetName() + "::eye_version")
       {
@@ -87,6 +87,7 @@ namespace gazebo
         this->jointControl->SetPositionTarget(jointId, command);
       }
     }
+
     void callbackvel(const std_msgs::Float64::ConstPtr &msg, const std::string &jointId) {
       // control method
       string jointNameCtrl1 = jointId;
@@ -103,9 +104,9 @@ namespace gazebo
       if (findIt != positions.end())
       {
         cout << "CHANGED CONTROL POLICY JOINT " << jointId << endl;
-        
+
         this->jointControl->Reset();
-        
+
         cout << "POSITIONS:" << endl;
         for (std::map<std::string, double>::iterator it = positions.begin(); it != positions.end(); ++it)
         {
@@ -126,8 +127,8 @@ namespace gazebo
           }
           cout << it->first << " " << positions[it->first] << endl;
         }
-      }  
-        
+      }
+
       double command = msg->data / this->DegOrRad;
       if (jointId == this->model->GetName() + "::eye_version")
       {
@@ -156,11 +157,11 @@ namespace gazebo
         this->jointControl->SetVelocityTarget(jointId, command);
       }
     }
-    
+
     void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     {
       cout << "[ROS CONTROLLER] controller initialized" << endl;
-        
+
       string argument;
 
       if (!_sdf->HasElement("degree"))
@@ -181,8 +182,8 @@ namespace gazebo
         std::cout << "Wrong value for the parameter <degree> in ROSController_iCub, default to radiants" << std::endl;
         this->DegOrRad = 1;
       }
-          
-        
+
+
       if (!ros::isInitialized())
       {
         ROS_FATAL_STREAM("A ROS node for Gazebo has not been initialized, unable to load plugin. "
@@ -199,20 +200,20 @@ namespace gazebo
       // simulation iteration.
       this->updateConnection = event::Events::ConnectWorldUpdateBegin(
           boost::bind(&ROSController_iCub::OnUpdate, this, _1));
-      
+
       string pubTopicName = this->model->GetName() + "/joints";
       this->jointsPublisher = this->nh.advertise<sensor_msgs::JointState>(pubTopicName, 1);
-      
+
       cout << "[ROS CONTROLLER] publisher initialized" << endl;
-    
+
       for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
       {
-	string posName = this->model->GetName() + "/" + it->second->GetName() + "/pos";
+        string posName = this->model->GetName() + "/" + it->second->GetName() + "/pos";
         ros::Subscriber subTemp = nh.subscribe<std_msgs::Float64>(posName, 1, boost::bind(&ROSController_iCub::callbackpos, this, _1, it->first));
-	posSubscriber.push_back(subTemp);
-	string velName = this->model->GetName() + "/" + it->second->GetName() + "/vel";
-	ros::Subscriber subTemp2 = nh.subscribe<std_msgs::Float64>(velName, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, it->first));
-	velSubscriber.push_back(subTemp2);
+        posSubscriber.push_back(subTemp);
+        string velName = this->model->GetName() + "/" + it->second->GetName() + "/vel";
+        ros::Subscriber subTemp2 = nh.subscribe<std_msgs::Float64>(velName, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, it->first));
+        velSubscriber.push_back(subTemp2);
       }
       //eye version
       string posNameVs = this->model->GetName() + "/" + "eye_version" + "/pos";
@@ -228,9 +229,9 @@ namespace gazebo
       string velNameVg = this->model->GetName() + "/" + "eye_vergence" + "/vel";
       ros::Subscriber subTempVgVel = nh.subscribe<std_msgs::Float64>(velNameVg, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, this->model->GetName() + "::eye_vergence"));
       velSubscriber.push_back(subTempVgVel);
-      
+
       cout << "[ROS CONTROLLER] subscribers initialized" << endl;
-      
+
     }
 
     // Called by the world update start event
@@ -238,15 +239,15 @@ namespace gazebo
     {
       this->jointControl->Update();
       vector<string> joints_name;
-      
+
       sensor_msgs::JointState msg;
       msg.header.stamp = ros::Time::now();
       for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
       {
-	msg.name.push_back(it->second->GetName());
-	msg.position.push_back(it->second->GetAngle(0).Radian() * this->DegOrRad);
-	msg.velocity.push_back(it->second->GetVelocity(0) * this->DegOrRad);
-	msg.effort.push_back(it->second->GetForce(0));
+        msg.name.push_back(it->second->GetName());
+        msg.position.push_back(it->second->GetAngle(0).Radian() * this->DegOrRad);
+        msg.velocity.push_back(it->second->GetVelocity(0) * this->DegOrRad);
+        msg.effort.push_back(it->second->GetForce(0));
       }
       gazebo::physics::JointPtr left_eye, right_eye;
       left_eye = this->joints.at(this->model->GetName() + "::left_eye_pan");
@@ -269,20 +270,20 @@ namespace gazebo
     }
 
     // Pointer to the model
-  private: 
+  private:
     physics::ModelPtr model;
     event::ConnectionPtr updateConnection;
     gazebo::physics::JointControllerPtr jointControl;
     std::map<std::string, gazebo::physics::JointPtr> joints;
-    
+
     ros::NodeHandle nh;
     ros::Publisher jointsPublisher;
     vector<ros::Subscriber> posSubscriber;
     vector<ros::Subscriber> velSubscriber;
-    
+
     double DegOrRad;
   };
 
   // Register this plugin with the simulator
   GZ_REGISTER_MODEL_PLUGIN(ROSController_iCub)
-} 
+}
