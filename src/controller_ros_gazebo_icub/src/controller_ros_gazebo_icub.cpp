@@ -19,6 +19,46 @@ namespace gazebo
   {
   public: 
     void callbackpos(const std_msgs::Float64::ConstPtr &msg, const std::string &jointId) {
+      // control method
+      string jointNameCtrl1 = jointId;
+      string jointNameCtrl2 = jointId;
+      if ((jointId == this->model->GetName() + "::eye_version") ||
+          (jointId == this->model->GetName() + "::eye_vergence"))
+      {
+        jointNameCtrl1 = this->model->GetName() + "::left_eye_pan";
+        jointNameCtrl2 = this->model->GetName() + "::right_eye_pan";
+      }
+      std::map<std::string, double> positions = this->jointControl->GetPositions();
+      std::map<std::string, double> velocities = this->jointControl->GetVelocities();
+      std::map<std::string, double>::iterator findIt = velocities.find(jointNameCtrl1);
+      if (findIt != velocities.end())
+      {
+        cout << "CHANGED CONTROL POLICY JOINT " << jointId << endl;
+        
+        this->jointControl->Reset();
+        
+        cout << "POSITIONS:" << endl;
+        for (std::map<std::string, double>::iterator it = positions.begin(); it != positions.end(); ++it)
+        {
+          if ((it->first != jointNameCtrl1) && (it->first != jointNameCtrl2))
+          {
+            this->jointControl->SetPositionTarget(it->first, positions[it->first]);
+            cout << "OLD ";
+          }
+          cout << it->first << " " << positions[it->first] << endl;
+        }
+        cout << "VELOCITIES:" << endl;
+        for (std::map<std::string, double>::iterator it = velocities.begin(); it != velocities.end(); ++it)
+        {
+          if ((it->first != jointNameCtrl1) && (it->first != jointNameCtrl2))
+          {
+            this->jointControl->SetVelocityTarget(it->first, positions[it->first]);
+            cout << "OLD ";
+          }
+          cout << it->first << " " << positions[it->first] << endl;
+        }
+      }  
+        
       double command = msg->data / this->DegOrRad;
       if (jointId == this->model->GetName() + "::eye_version")
       {
@@ -31,7 +71,7 @@ namespace gazebo
           this->jointControl->SetPositionTarget(this->model->GetName() + "::left_eye_pan", left_pan_pos);
           this->jointControl->SetPositionTarget(this->model->GetName() + "::right_eye_pan", right_pan_pos);
       }
-      else if (jointId == "iCub::eye_vergence")
+      else if (jointId == this->model->GetName() + "::eye_vergence")
       {
           gazebo::physics::JointPtr left_eye, right_eye;
           left_eye = this->joints.at(this->model->GetName() + "::left_eye_pan");
@@ -43,9 +83,51 @@ namespace gazebo
           this->jointControl->SetPositionTarget(this->model->GetName() + "::right_eye_pan", right_pan_pos);
       }
       else
+      {
         this->jointControl->SetPositionTarget(jointId, command);
+      }
     }
     void callbackvel(const std_msgs::Float64::ConstPtr &msg, const std::string &jointId) {
+      // control method
+      string jointNameCtrl1 = jointId;
+      string jointNameCtrl2 = jointId;
+      if ((jointId == this->model->GetName() + "::eye_version") ||
+          (jointId == this->model->GetName() + "::eye_vergence"))
+      {
+        jointNameCtrl1 = this->model->GetName() + "::left_eye_pan";
+        jointNameCtrl2 = this->model->GetName() + "::right_eye_pan";
+      }
+      std::map<std::string, double> positions = this->jointControl->GetPositions();
+      std::map<std::string, double> velocities = this->jointControl->GetVelocities();
+      std::map<std::string, double>::iterator findIt = positions.find(jointNameCtrl1);
+      if (findIt != positions.end())
+      {
+        cout << "CHANGED CONTROL POLICY JOINT " << jointId << endl;
+        
+        this->jointControl->Reset();
+        
+        cout << "POSITIONS:" << endl;
+        for (std::map<std::string, double>::iterator it = positions.begin(); it != positions.end(); ++it)
+        {
+          if ((it->first != jointNameCtrl1) && (it->first != jointNameCtrl2))
+          {
+            this->jointControl->SetPositionTarget(it->first, positions[it->first]);
+            cout << "OLD ";
+          }
+          cout << it->first << " " << positions[it->first] << endl;
+        }
+        cout << "VELOCITIES:" << endl;
+        for (std::map<std::string, double>::iterator it = velocities.begin(); it != velocities.end(); ++it)
+        {
+          if ((it->first != jointNameCtrl1) && (it->first != jointNameCtrl2))
+          {
+            this->jointControl->SetVelocityTarget(it->first, positions[it->first]);
+            cout << "OLD ";
+          }
+          cout << it->first << " " << positions[it->first] << endl;
+        }
+      }  
+        
       double command = msg->data / this->DegOrRad;
       if (jointId == this->model->GetName() + "::eye_version")
       {
@@ -70,16 +152,20 @@ namespace gazebo
           this->jointControl->SetVelocityTarget(this->model->GetName() + "::right_eye_pan", right_pan_pos);
       }
       else
+      {
         this->jointControl->SetVelocityTarget(jointId, command);
+      }
     }
     
     void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     {
+      cout << "[ROS CONTROLLER] controller initialized" << endl;
+        
       string argument;
 
       if (!_sdf->HasElement("degree"))
       {
-        std::cout << "Missing parameter <Degree> in ROSController_iCub, default to radiants" << std::endl;
+        std::cout << "Missing parameter <degree> in ROSController_iCub, default to radiants" << std::endl;
         this->DegOrRad = 1;
       }
       else if (_sdf->Get<std::string>("degree") == "true")
@@ -92,7 +178,7 @@ namespace gazebo
       }
       else
       {
-        std::cout << "Wrong value for the parameter <Degree> in ROSController_iCub, default to radiants" << std::endl;
+        std::cout << "Wrong value for the parameter <degree> in ROSController_iCub, default to radiants" << std::endl;
         this->DegOrRad = 1;
       }
           
@@ -116,6 +202,8 @@ namespace gazebo
       
       string pubTopicName = this->model->GetName() + "/joints";
       this->jointsPublisher = this->nh.advertise<sensor_msgs::JointState>(pubTopicName, 1);
+      
+      cout << "[ROS CONTROLLER] publisher initialized" << endl;
     
       for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
       {
@@ -140,6 +228,8 @@ namespace gazebo
       string velNameVg = this->model->GetName() + "/" + "eye_vergence" + "/vel";
       ros::Subscriber subTempVgVel = nh.subscribe<std_msgs::Float64>(velNameVg, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, this->model->GetName() + "::eye_vergence"));
       velSubscriber.push_back(subTempVgVel);
+      
+      cout << "[ROS CONTROLLER] subscribers initialized" << endl;
       
     }
 
