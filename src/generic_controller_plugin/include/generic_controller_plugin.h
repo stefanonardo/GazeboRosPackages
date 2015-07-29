@@ -7,8 +7,17 @@
 #include <gazebo/physics/physics.hh>
 #include <gazebo/gazebo.hh>
 
+#include <gazebo/msgs/msgs.hh>
+#include <gazebo/transport/transport.hh>
+#include <gazebo/transport/Node.hh>
+#include <gazebo/transport/Publisher.hh>
+
 #include <std_msgs/Float64.h>
+#include <geometry_msgs/Vector3.h>
+
 #include <ros/ros.h>
+
+#include <mutex>
 
 namespace gazebo
 {
@@ -21,7 +30,7 @@ class GenericControlPlugin : public ModelPlugin
 public:
 
   GenericControlPlugin();
-  ~GenericControlPlugin() {}
+  ~GenericControlPlugin();
 
   // Load the plugin and initilize all controllers
   void Load(physics::ModelPtr parent, sdf::ElementPtr sdf);
@@ -34,6 +43,10 @@ private:
   // check if controller for current joint is specified in SDF and return pointer to sdf element
   bool existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf, 
                            const physics::JointPtr &joint);
+
+  // check if visual properties (for client-side animation of models) exist, and return a pointer to the SDF element
+  bool existsVisualSDF(sdf::ElementPtr &sdf_visual_def, const sdf::ElementPtr& sdf,
+                       const physics::JointPtr& joint);
   
   // get PID controller values from SDF
   common::PID getControllerPID(const sdf::ElementPtr &sdf_ctrl_def);
@@ -72,6 +85,22 @@ private:
   std::vector<ros::Subscriber> m_pos_sub_vec;
   std::vector<ros::Subscriber> m_vel_sub_vec;
 
+  // Maps for joint names and rotation axes (visual properties for client-side animation)
+  std::map<std::string, std::string> m_joint_name_mappings;
+  std::map<std::string, geometry_msgs::Vector3> m_joint_axis_mappings;
+
+  /// \brief keep track of controller update sim-time.
+  private: gazebo::common::Time lastControllerUpdateTime;
+
+  /// \brief Controller update mutex.
+  private: std::mutex mutex;
+
+  // Gazebo node
+  private: transport::NodePtr node;
+  // Gazebo joint message publisher
+  private: transport::PublisherPtr jointPub_default;
+
+  private: void sendJointUpdateMsg(const physics::JointPtr &joint);
 };
 
 } // namespace gazebo

@@ -181,6 +181,7 @@ void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
   // reset topic connection counts
   pub_link_states_connection_count_ = 0;
   pub_model_states_connection_count_ = 0;
+  pub_joint_states_connection_count_ = 0;
 
   /// \brief advertise all services
   advertiseServices();
@@ -343,6 +344,15 @@ void GazeboRosApiPlugin::advertiseServices()
                                                             boost::bind(&GazeboRosApiPlugin::onModelStatesDisconnect,this),
                                                             ros::VoidPtr(), &gazebo_queue_);
   pub_model_states_ = nh_->advertise(pub_model_states_ao);
+
+  // publish complete joint states in world frame
+  ros::AdvertiseOptions pub_joint_states_ao =
+    ros::AdvertiseOptions::create<gazebo_msgs::JointStates>(
+                                                           "joint_states",10,
+                                                           boost::bind(&GazeboRosApiPlugin::onJointStatesConnect,this),
+                                                           boost::bind(&GazeboRosApiPlugin::onJointStatesDisconnect,this),
+                                                           ros::VoidPtr(), &gazebo_queue_);
+  pub_joint_states_ = nh_->advertise(pub_joint_states_ao);
 
   // Advertise more services on the custom queue
   std::string set_link_properties_service_name("set_link_properties");
@@ -608,6 +618,13 @@ void GazeboRosApiPlugin::onModelStatesConnect()
     pub_model_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::publishModelStates,this));
 }
 
+void GazeboRosApiPlugin::onJointStatesConnect()
+{
+  pub_joint_states_connection_count_++;
+  if (pub_joint_states_connection_count_ == 1) // connect on first subscriber
+    pub_joint_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::publishJointStates,this));
+}
+
 void GazeboRosApiPlugin::onLinkStatesDisconnect()
 {
   pub_link_states_connection_count_--;
@@ -627,6 +644,17 @@ void GazeboRosApiPlugin::onModelStatesDisconnect()
     gazebo::event::Events::DisconnectWorldUpdateBegin(pub_model_states_event_);
     if (pub_model_states_connection_count_ < 0) // should not be possible
       ROS_ERROR("one too mandy disconnect from pub_model_states_ in gazebo_ros.cpp? something weird");
+  }
+}
+
+void GazeboRosApiPlugin::onJointStatesDisconnect()
+{
+  pub_joint_states_connection_count_--;
+  if (pub_joint_states_connection_count_ <= 0) // disconnect with no subscribers
+  {
+    gazebo::event::Events::DisconnectWorldUpdateBegin(pub_joint_states_event_);
+    if (pub_joint_states_connection_count_ < 0) // should not be possible
+      ROS_ERROR("one too mandy disconnect from pub_joint_states_ in gazebo_ros.cpp? something weird");
   }
 }
 
@@ -1081,6 +1109,23 @@ bool GazeboRosApiPlugin::getJointProperties(gazebo_msgs::GetJointProperties::Req
 
     res.rate.clear(); // use GetVelocity(i)
     res.rate.push_back(joint->GetVelocity(0));
+    
+    res.axes.clear();
+    gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
+    gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
+    
+    geometry_msgs::Vector3 axis0;
+    axis0.x = vec_axis0.x;
+    axis0.y = vec_axis0.y;
+    axis0.z = vec_axis0.z;
+    
+    geometry_msgs::Vector3 axis1;
+    axis1.x = vec_axis1.x;
+    axis1.y = vec_axis1.y;
+    axis1.z = vec_axis1.z;
+    
+    res.axes.push_back(axis0);
+    res.axes.push_back(axis1);
 
     res.success = true;
     res.status_message = "GetJointProperties: got properties";
@@ -2261,6 +2306,72 @@ void GazeboRosApiPlugin::publishModelStates()
     model_states.twist.push_back(twist);
   }
   pub_model_states_.publish(model_states);
+}
+
+void GazeboRosApiPlugin::publishJointStates()
+{
+  gazebo_msgs::JointStates joint_states;
+  for (unsigned int i = 0; i < world_->GetModelCount(); i ++)
+  {
+    gazebo::physics::ModelPtr model = world_->GetModel(i);
+    gazebo::physics::Joint_V model_joints = model->GetJoints();
+
+    for (unsigned int j = 0; j < model_joints.size(); j++)
+    {
+      gazebo::physics::JointPtr joint = model_joints[j];
+      joint_states.name.push_back(model->GetName() + "::" + joint->GetName());
+      joint_states.position.push_back(joint->GetAngle(0).Radian());
+
+      joint_states.rate.push_back(joint->GetVelocity(0));
+
+      gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
+      gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
+
+      geometry_msgs::Vector3 axis0;
+      axis0.x = vec_axis0.x;
+      axis0.y = vec_axis0.y;
+      axis0.z = vec_axis0.z;
+
+      geometry_msgs::Vector3 axis1;
+      axis1.x = vec_axis1.x;
+      axis1.y = vec_axis1.y;
+      axis1.z = vec_axis1.z;
+
+      joint_states.axes.push_back(axis0);
+      joint_states.axes.push_back(axis1);
+
+      gazebo::physics::JointWrench jw = joint->GetForceTorque(0);
+
+      geometry_msgs::Vector3 body1_force;
+      body1_force.x = jw.body1Force.x;
+      body1_force.y = jw.body1Force.y;
+      body1_force.z = jw.body1Force.z;
+
+      joint_states.body1Forces.push_back(body1_force);
+
+      geometry_msgs::Vector3 body2_force;
+      body2_force.x = jw.body2Force.x;
+      body2_force.y = jw.body2Force.y;
+      body2_force.z = jw.body2Force.z;
+
+      joint_states.body2Forces.push_back(body2_force);
+
+      geometry_msgs::Vector3 body1_torque;
+      body1_torque.x = jw.body1Torque.x;
+      body1_torque.y = jw.body1Torque.y;
+      body1_torque.z = jw.body1Torque.z;
+
+      joint_states.body1Torques.push_back(body1_torque);
+
+      geometry_msgs::Vector3 body2_torque;
+      body2_torque.x = jw.body2Torque.x;
+      body2_torque.y = jw.body2Torque.y;
+      body2_torque.z = jw.body2Torque.z;
+
+      joint_states.body2Torques.push_back(body2_torque);
+    }
+  }
+  pub_joint_states_.publish(joint_states);
 }
 
 void GazeboRosApiPlugin::physicsReconfigureCallback(gazebo_ros::PhysicsConfig &config, uint32_t level)

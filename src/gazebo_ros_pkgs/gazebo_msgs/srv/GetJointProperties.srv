@@ -13,6 +13,7 @@ float64[] damping
 # joint state
 float64[] position
 float64[] rate
+geometry_msgs/Vector3[] axes
 # service return status
 bool success                         # return true if get successful
 string status_message                # comments if available

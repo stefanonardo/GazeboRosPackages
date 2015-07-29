@@ -25,6 +25,11 @@ GenericControlPlugin::GenericControlPlugin()
   m_nh = ros::NodeHandle();
 }
 
+GenericControlPlugin::~GenericControlPlugin()
+{
+  // this->node.reset();
+}
+
 void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf) 
 {
   // Store the pointer to the model
@@ -43,8 +48,6 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
     // check, if controller for current joint was specified in the SDF and return sdf element pointer to controller 
     if (existsControllerSDF(sdf_ctrl_def, sdf, joint))
     {
-      physics::JointPtr joint = joint_iter->second;
-
       // get controller parameter from sdf file
       common::PID ctrl_pid = getControllerPID(sdf_ctrl_def);
       std::string ctrl_type = getControllerType(sdf_ctrl_def);
@@ -59,15 +62,61 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
         createVelocityController(joint, ctrl_pid);
       }
     }
+
+    sdf::ElementPtr sdf_visual_def;
+    if (existsVisualSDF(sdf_visual_def, sdf, joint))
+    {
+      sdf::ElementPtr joint_name_element = sdf_visual_def->GetElement("joint_name");
+      sdf::ElementPtr joint_axis_element = sdf_visual_def->GetElement("joint_axis");
+
+      if (joint_name_element != NULL)
+      {
+        this->m_joint_name_mappings[joint->GetName()] = sdf_visual_def->GetValueString();
+      }
+
+      if (joint_axis_element != NULL)
+      {
+        sdf::Vector3 joint_axis = joint_axis_element->GetValueVector3();
+        geometry_msgs::Vector3 joint_axis_ros;
+        joint_axis_ros.x = joint_axis.x;
+        joint_axis_ros.y = joint_axis.y;
+        joint_axis_ros.z = joint_axis.z;
+
+        this->m_joint_axis_mappings[joint->GetName()] = joint_axis_ros;
+      }
+    }
   }
-  
+
+  // Controller time control.
+  this->lastControllerUpdateTime = this->m_model->GetWorld()->GetSimTime();
+
   // Listen to the update event. This event is broadcast every simulation iteration.
   m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
+
+  this->node = transport::NodePtr(new transport::Node());
+  this->node->Init(this->m_model->GetWorld()->GetName());
+
+  this->jointPub_default = this->node->Advertise<msgs::Joint>("/gazebo/default/joint_updates", 10, 60);
 }
 
 // Called by the world update start event
 void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 {
+  std::lock_guard<std::mutex> lock(this->mutex);
+
+  gazebo::common::Time curTime = this->m_model->GetWorld()->GetSimTime();
+
+  if (curTime > this->lastControllerUpdateTime)
+  {
+    // Update the control surfaces and publish the new state.
+    for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter)
+    {
+      physics::JointPtr joint = joint_iter->second;
+      sendJointUpdateMsg(joint);
+    }
+
+    this->lastControllerUpdateTime = curTime;
+  }
 }
 
 ///////////////////////////////////////// SDF parser functions ////////////////////////////////////////////
@@ -105,6 +154,37 @@ bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, co
   return false;
 }
 
+bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, const sdf::ElementPtr& sdf,
+                                              const physics::JointPtr& joint)
+{
+  sdf::ElementPtr sdf_visual = sdf->GetElement("visual");
+  while (sdf_visual != NULL)
+  {
+    sdf::ParamPtr joint_name_param = sdf_visual->GetAttribute("joint_name");
+    if (joint_name_param != NULL)
+    {
+      std::string joint_name = joint_name_param->GetAsString();
+      if (joint_name.compare(joint->GetName()) == 0)
+      {
+        ROS_INFO("Found visual properties for joint %s", joint_name.c_str());
+        sdf_visual_def = sdf_visual;
+        return true;
+      }
+      else
+      {
+        sdf_visual = sdf_visual->GetNextElement("visual");
+      }
+    }
+    else
+    {
+      ROS_WARN("Attribute 'joint_name' is not available for current joint definition.");
+      return false;
+    }
+  }
+
+  return false;
+}
+
 common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ctrl_def)
 {
   common::PID pid_param;
@@ -114,7 +194,7 @@ common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ct
     sdf::ElementPtr elem_pid = sdf_ctrl_def->GetElement("pid");
     if (elem_pid != NULL)
     {
-      sdf::Vector3 pid_values = elem_pid->GetValueVector3();
+      sdf::Vector3 pid_values = elem_pid->Get<sdf::Vector3>();
       ROS_INFO("Controller PID values p=%f, i=%f, d=%f", pid_values.x, pid_values.y, pid_values.z);
       pid_param = common::PID(pid_values.x, pid_values.y, pid_values.z);
       return pid_param;
@@ -135,7 +215,7 @@ std::string GenericControlPlugin::getControllerType(const sdf::ElementPtr &sdf_c
     sdf::ElementPtr elem_type = sdf_ctrl_def->GetElement("type");
     if (elem_type != NULL)
     {
-      ctrl_type = elem_type->GetValueString();
+      ctrl_type = elem_type->Get<std::string>();
       ROS_INFO("Controller has type %s", ctrl_type.c_str());
       return ctrl_type;
     }
@@ -197,10 +277,32 @@ void GenericControlPlugin::positionCB(const std_msgs::Float64::ConstPtr &msg, co
 void GenericControlPlugin::velocityCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint)
 {
   ROS_DEBUG("velocityCB called! Joint name = %s, joint vel = %f", joint->GetName().c_str(), msg->data);
-
   double velocity_m_per_sec(msg->data);
   m_joint_controller->SetVelocityTarget(joint->GetScopedName(), velocity_m_per_sec);
   //pid.SetCmd(velocity_m_per_sec);
+}
+
+void GenericControlPlugin::sendJointUpdateMsg(const physics::JointPtr &joint)
+{
+  gazebo::msgs::Joint _msg;
+
+  joint->FillMsg(_msg);
+
+  if (!_msg.IsInitialized())
+  {
+    std::vector<std::string> init_errors;
+    _msg.FindInitializationErrors(&init_errors);
+
+    std::cout << " failed to initialize joint message, not sending: errors = " << init_errors.size() << std::endl;
+    for (std::vector<std::string>::const_iterator it = init_errors.begin(); it != init_errors.end(); it++)
+      std::cout << *it << ";";
+
+    std::cout << std::endl;
+  }
+  else
+  {
+    this->jointPub_default->Publish(_msg, true);
+  }
 }
 
 // Register this plugin with the simulator

@@ -93,6 +93,8 @@
 #include "gazebo_msgs/ModelStates.h"
 #include "gazebo_msgs/LinkStates.h"
 
+#include "gazebo_msgs/JointStates.h"
+
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Wrench.h"
 #include "geometry_msgs/Pose.h"
@@ -166,6 +168,12 @@ public:
 
   /// \brief
   void onModelStatesDisconnect();
+
+  /// \brief
+  void onJointStatesConnect();
+
+  /// \brief
+  void onJointStatesDisconnect();
 
   /// \brief Function for inserting a URDF into Gazebo from ROS Service Call
   bool spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
@@ -312,6 +320,9 @@ private:
   void publishModelStates();
 
   /// \brief
+  void publishJointStates();
+
+  /// \brief
   void stripXmlDeclaration(std::string &model_xml);
 
   /// \brief Update the model name and pose of the SDF file before sending to Gazebo
@@ -454,6 +465,12 @@ private:
   ros::Subscriber    set_model_state_topic_;
   ros::Publisher     pub_link_states_;
   ros::Publisher     pub_model_states_;
+
+  // HBP
+  ros::Publisher     pub_joint_states_;
+  int                pub_joint_states_connection_count_;
+  gazebo::event::ConnectionPtr pub_joint_states_event_;
+
   int                pub_link_states_connection_count_;
   int                pub_model_states_connection_count_;
 

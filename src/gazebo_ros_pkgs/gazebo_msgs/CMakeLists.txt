@@ -19,6 +19,7 @@ add_message_files(
   LinkStates.msg
   ModelState.msg
   ModelStates.msg
+  JointStates.msg
   ODEJointProperties.msg
   ODEPhysics.msg
   WorldState.msg
