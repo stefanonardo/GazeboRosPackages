@@ -56,6 +56,7 @@ add_service_files(
    GetVersion.srv
    GetTransferFunctions.srv
    SetTransferFunction.srv
+   DeleteTransferFunction.srv
 )
 
 ## Generate actions in the 'action' folder
