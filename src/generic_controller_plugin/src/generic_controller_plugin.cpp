@@ -11,6 +11,12 @@
 #include <sensor_msgs/JointState.h>
 #include <ros/time.h>
 
+#if SDF_MAJOR_VERSION == 3
+  #pragma message "INFO: Using SDF v3 - Redefining some SDF v2 getters"
+  #define GetValueVector3 Get<sdf::Vector3>
+  #define GetValueString Get<std::string>
+#endif
+
 namespace gazebo
 {
 
