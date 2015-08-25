@@ -54,6 +54,7 @@ add_service_files(
    StartNewSimulation.srv
    GetSimulationState.srv
    GetVersion.srv
+   Health.srv
    GetTransferFunctions.srv
    SetTransferFunction.srv
    DeleteTransferFunction.srv
