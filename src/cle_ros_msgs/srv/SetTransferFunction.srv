@@ -1,4 +1,4 @@
 string transfer_function_name
 string transfer_function_source
 ---
-bool success
+string error_message
