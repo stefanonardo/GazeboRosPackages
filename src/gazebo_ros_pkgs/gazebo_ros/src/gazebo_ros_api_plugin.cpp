@@ -1740,20 +1740,28 @@ bool GazeboRosApiPlugin::exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &re
   res.sdf_dump = "";
   if (this->world_ == NULL) return false;
 
-  int i = __sync_fetch_and_add(&(this->export_sdf_count_), 1);
-  std::string fname = std::string("/tmp/export_sdf_") + boost::str(boost::format("%d") % i);
+  boost::shared_ptr<msgs::Response> response = gazebo::transport::request(world_->GetName(), "world_sdf");
 
-  this->world_->Save(fname);
+  msgs::GzString msg;
+  std::string msgData;
 
-  try {
-    boost::filesystem::path fpath(fname);
-    boost::iostreams::mapped_file fmap(fpath);
-    res.sdf_dump = std::string(fmap.data());
-    boost::filesystem::remove(fname);
-  }
-  catch (...) {
+  // Make sure the response is correct
+  if (response->response() == "error" || response->type() != msg.GetTypeName()) {
     return false;
   }
+
+  // Parse the response message
+  msg.ParseFromString(response->serialized_data());
+  // Parse the string into sdf, so we can check whether a world exists.
+  sdf::SDF sdf_parsed;
+  sdf_parsed.SetFromString(msg.data());
+
+  // Check that sdf contains world
+  if (!sdf_parsed.root->HasElement("world")) {
+    return false;
+  }
+
+  res.sdf_dump = sdf_parsed.root->ToString("");
 
   return true;
 }
