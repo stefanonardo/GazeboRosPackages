@@ -47,6 +47,7 @@ add_message_files(
    SpikeEvent.msg
    SpikeData.msg
    CLEError.msg
+   SimulationMetrics.msg
 )
 
 ## Generate services in the 'srv' folder
