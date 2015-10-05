@@ -2,7 +2,7 @@
 # Transfer function, Smach script, PyNN script
 
 string sourceType # e.g., "Transfer Function"
-string errorType # e.g., "NoOrMultipleNames", "Compile", "Loading", "RunTime"
+string errorType # e.g., "NoOrMultipleNames", "Compile", "Loading", "Runtime"
 string message # description of the error, e.g., "IndentationError: unexpected indent"
 
 string functionName # python def name of the function causing the error, empty if unavailable
