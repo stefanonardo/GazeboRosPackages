@@ -28,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # Depend on system install of Gazebo 
 find_package(gazebo REQUIRED)
+find_package(OGRE)
 
 catkin_package(
   CATKIN_DEPENDS
@@ -39,7 +40,11 @@ catkin_package(
   DEPENDS gazebo
 )
 
-link_directories(${GAZEBO_LIBRARY_DIRS})
+link_directories(
+  ${GAZEBO_LIBRARY_DIRS}
+  ${OGRE_LIBRARY_DIRS}
+)
+
 include_directories(include
   ${TBB_INCLUDE_DIR}
   ${Boost_INCLUDE_DIR}
