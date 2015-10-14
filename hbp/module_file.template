@@ -17,7 +17,7 @@ set             platform        "rhel6"
 set             compiler        "$BUILD_COMPILER"
 set             architecture    "$BUILD_ARCHITECTURE"
 
-set             root            "$sw_basedir/$package_name/$version/$platform/$compiler/$architecture/"
+set             root            "$sw_basedir/$package_name/$version/$platform/$compiler/$architecture"
 module-whatis   "loads the environment for $package_name"
 
 
@@ -34,4 +34,4 @@ and 'module avail' to list all the availables ones.
 
 # Update PATH environment:
 setenv         ROS_HBP_PACKAGES_SETUP_FILE     $root/setup.bash
-setenv         ROS_HBP_PACKAGES_BIN_DIR        $root/bin
+setenv         ROS_HBP_PACKAGES_LIB_DIR        $root/lib
