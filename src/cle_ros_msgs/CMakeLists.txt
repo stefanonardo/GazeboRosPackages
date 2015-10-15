@@ -53,13 +53,14 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
    FILES
-   StartNewSimulation.srv
+   DeleteTransferFunction.srv
    GetSimulationState.srv
+   GetTransferFunctions.srv
    GetVersion.srv
    Health.srv
-   GetTransferFunctions.srv
+   IsSimulationRunning.srv
    SetTransferFunction.srv
-   DeleteTransferFunction.srv
+   StartNewSimulation.srv
 )
 
 ## Generate actions in the 'action' folder
