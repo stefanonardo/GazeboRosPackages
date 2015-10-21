@@ -304,7 +304,7 @@ void HuskyPlugin::UpdateChild()
   odom.twist.twist.angular.y = 0;
   odom.twist.twist.angular.z = 0;
 
-  odom_pub_.publish( odom ); 
+  odom_pub_.publish( odom );
 
   js_.header.stamp.sec = time_now.sec;
   js_.header.stamp.nsec = time_now.nsec;
@@ -312,24 +312,28 @@ void HuskyPlugin::UpdateChild()
   {
     js_.position[0] = joints_[BL]->GetAngle(0).Radian();
     js_.velocity[0] = joints_[BL]->GetVelocity(0);
+    js_.effort[0] = joints_[BL]->GetForce(0); //GetForce not implemented yet!
   }
 
   if (this->set_joints_[BR])
   {
     js_.position[1] = joints_[BR]->GetAngle(0).Radian();
     js_.velocity[1] = joints_[BR]->GetVelocity(0);
+    js_.effort[1] = joints_[BR]->GetForce(0);
   }
 
   if (this->set_joints_[FL])
   {
     js_.position[2] = joints_[FL]->GetAngle(0).Radian();
     js_.velocity[2] = joints_[FL]->GetVelocity(0);
+    js_.effort[2] = joints_[FL]->GetForce(0);
   }
 
   if (this->set_joints_[FR])
   {
     js_.position[3] = joints_[FR]->GetAngle(0).Radian();
     js_.velocity[3] = joints_[FR]->GetVelocity(0);
+    js_.effort[3] = joints_[FR]->GetForce(0);
   }
 
   joint_state_pub_.publish( js_ );
