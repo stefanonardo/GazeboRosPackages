@@ -44,6 +44,9 @@ namespace gazebo
     /// \param take in SDF root element
     public: void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
 
+    /// \brief Sensor reset
+    public: void Reset();
+
     /// \brief Update the controller
     protected: virtual void OnNewFrame(const unsigned char *_image,
                    unsigned int _width, unsigned int _height,

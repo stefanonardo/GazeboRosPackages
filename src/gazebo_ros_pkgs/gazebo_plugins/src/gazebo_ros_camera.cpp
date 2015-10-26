@@ -98,4 +98,10 @@ void GazeboRosCamera::OnNewFrame(const unsigned char *_image,
     }
   }
 }
+
+
+void GazeboRosCamera::Reset() {
+  this->last_update_time_ = 0.0;
+}
+
 }
