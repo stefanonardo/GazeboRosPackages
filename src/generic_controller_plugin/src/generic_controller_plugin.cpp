@@ -187,7 +187,7 @@ void GenericControlPlugin::createVelocityController(const physics::JointPtr &joi
 
 void GenericControlPlugin::positionCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint)
 {
-  ROS_INFO("positionCB called! Joint name = %s, joint pos = %f", joint->GetName().c_str(), msg->data);
+  ROS_DEBUG("positionCB called! Joint name = %s, joint pos = %f", joint->GetName().c_str(), msg->data);
 
   double angle_rad(msg->data);
   m_joint_controller->SetPositionTarget(joint->GetScopedName(), angle_rad);
@@ -196,7 +196,7 @@ void GenericControlPlugin::positionCB(const std_msgs::Float64::ConstPtr &msg, co
 
 void GenericControlPlugin::velocityCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint)
 {
-  ROS_INFO("velocityCB called! Joint name = %s, joint vel = %f", joint->GetName().c_str(), msg->data);
+  ROS_DEBUG("velocityCB called! Joint name = %s, joint vel = %f", joint->GetName().c_str(), msg->data);
 
   double velocity_m_per_sec(msg->data);
   m_joint_controller->SetVelocityTarget(joint->GetScopedName(), velocity_m_per_sec);
