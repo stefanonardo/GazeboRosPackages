@@ -14,6 +14,7 @@
 
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/Vector3.h>
+#include <sensor_msgs/JointState.h>
 
 #include <ros/ros.h>
 
@@ -101,6 +102,10 @@ private:
   private: transport::PublisherPtr jointPub_default;
 
   private: void sendJointUpdateMsg(const physics::JointPtr &joint);
+  // ROS joint state publisher
+  ros::Publisher m_joint_state_pub;
+  sensor_msgs::JointState m_js;
+
 };
 
 } // namespace gazebo
