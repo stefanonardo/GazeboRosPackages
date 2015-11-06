@@ -54,11 +54,13 @@ add_message_files(
 add_service_files(
    FILES
    DeleteTransferFunction.srv
+   GetBrain.srv
    GetSimulationState.srv
    GetTransferFunctions.srv
    GetVersion.srv
    Health.srv
    IsSimulationRunning.srv
+   SetBrain.srv
    SetTransferFunction.srv
    StartNewSimulation.srv
 )

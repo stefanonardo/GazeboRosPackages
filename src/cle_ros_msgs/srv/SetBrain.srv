@@ -3,5 +3,5 @@ string brain_data       # Brain data field
 string data_type        # Type of data in brain_data: text or base64
 ---
 string error_message    # Error message
-int error_line          # Line in code where error occured
-int error_column        # Column in code where error occured
+int32 error_line          # Line in code where error occured
+int32 error_column        # Column in code where error occured
