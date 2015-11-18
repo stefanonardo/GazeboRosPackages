@@ -7,7 +7,6 @@
 #include "generic_controller_plugin.h"
 
 #include <boost/bind.hpp>
-
 #include <sensor_msgs/JointState.h>
 #include <ros/time.h>
 
@@ -27,10 +26,10 @@ GenericControlPlugin::GenericControlPlugin()
 
 GenericControlPlugin::~GenericControlPlugin()
 {
-  // this->node.reset();
+  m_nh.shutdown();
 }
 
-void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf) 
+void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 {
   // Store the pointer to the model
   m_model = parent;
@@ -39,12 +38,12 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 
   //sdf::ElementPtr sdf->GetElement("");
   ROS_INFO("sdf name %s, sdf description %s", sdf->GetName().c_str(), sdf->GetDescription().c_str());
-  
+
   for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter)
   {
     physics::JointPtr joint = joint_iter->second;
     sdf::ElementPtr sdf_ctrl_def;
-    
+
     // check, if controller for current joint was specified in the SDF and return sdf element pointer to controller 
     if (existsControllerSDF(sdf_ctrl_def, sdf, joint))
     {
@@ -90,13 +89,23 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   // Controller time control.
   this->lastControllerUpdateTime = this->m_model->GetWorld()->GetSimTime();
 
+  int numJoints = m_joints.size();
+  m_js.header.stamp.sec = this->lastControllerUpdateTime.sec;
+  m_js.header.stamp.nsec = this->lastControllerUpdateTime.nsec;
+  m_js.name.resize ( numJoints );
+  m_js.position.resize ( numJoints );
+  m_js.velocity.resize ( numJoints );
+  m_js.effort.resize ( numJoints );
+
   // Listen to the update event. This event is broadcast every simulation iteration.
   m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
 
   this->node = transport::NodePtr(new transport::Node());
   this->node->Init(this->m_model->GetWorld()->GetName());
 
-  this->jointPub_default = this->node->Advertise<msgs::Joint>("/gazebo/default/joint_updates", 10, 60);
+  this->jointPub_default = this->node->Advertise<msgs::Joint>( "/gazebo/default/joint_updates", 10, 60 );
+  this->m_joint_state_pub = m_nh.advertise<sensor_msgs::JointState>( "joint_states", 10 );
+
 }
 
 // Called by the world update start event
@@ -108,15 +117,26 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 
   if (curTime > this->lastControllerUpdateTime)
   {
+
+    m_js.header.stamp.sec = curTime.sec;
+    m_js.header.stamp.nsec = curTime.nsec;
     // Update the control surfaces and publish the new state.
-    for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter)
+    int curr_ind = 0;
+    for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter, ++curr_ind)
     {
       physics::JointPtr joint = joint_iter->second;
+      m_js.name[curr_ind] = joint->GetName();
+      m_js.position[curr_ind] = joint->GetAngle(0).Radian();
+      m_js.velocity[curr_ind] = joint->GetVelocity(0);
+      m_js.effort[curr_ind] = joint->GetForce(0);
+
       sendJointUpdateMsg(joint);
     }
 
-    this->lastControllerUpdateTime = curTime;
+    m_joint_state_pub.publish ( m_js );
   }
+  this->lastControllerUpdateTime = curTime;
+
 }
 
 ///////////////////////////////////////// SDF parser functions ////////////////////////////////////////////
@@ -188,7 +208,7 @@ bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, cons
 common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ctrl_def)
 {
   common::PID pid_param;
-  
+
   if (sdf_ctrl_def != NULL)
   {
     sdf::ElementPtr elem_pid = sdf_ctrl_def->GetElement("pid");
@@ -200,7 +220,7 @@ common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ct
       return pid_param;
     }
   }
-  
+
   ROS_WARN("Could not find controller PID parameter in SDF file: Using default values.");
   pid_param = common::PID(1.0, 0.1, 0.01);
   return pid_param;
@@ -209,7 +229,7 @@ common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ct
 std::string GenericControlPlugin::getControllerType(const sdf::ElementPtr &sdf_ctrl_def)
 {
   std::string ctrl_type = "";
-  
+
   if (sdf_ctrl_def != NULL)
   {
     sdf::ElementPtr elem_type = sdf_ctrl_def->GetElement("type");
@@ -220,7 +240,7 @@ std::string GenericControlPlugin::getControllerType(const sdf::ElementPtr &sdf_c
       return ctrl_type;
     }
   }
-  
+
   ROS_WARN("Could not find controller type in SDF file.");
   return ctrl_type;
 }
@@ -231,17 +251,17 @@ void GenericControlPlugin::createPositionController(const physics::JointPtr &joi
 {
   // generate joint topic name using the model name as prefix
   std::string topic_name = m_model->GetName() + "/" + joint->GetName() + "/cmd_pos";
-  
+
   // Add ROS topic for position control
-  m_pos_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1, 
+  m_pos_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1,
                                                             boost::bind(&GenericControlPlugin::positionCB, this, _1, joint)));
 
   // Create PID parameter for position controller
   m_joint_controller->SetPositionPID(joint->GetScopedName(), pid_param);
-  
+
   // Initialize controller with zero position
   m_joint_controller->SetPositionTarget(joint->GetScopedName(), 0.0);
-  
+
   ROS_INFO("Added new position controller for joint %s", joint->GetName().c_str());
 }
 
@@ -249,17 +269,17 @@ void GenericControlPlugin::createVelocityController(const physics::JointPtr &joi
 {
   // generate joint topic name using the model name as prefix
   std::string topic_name = m_model->GetName() + "/" + joint->GetName() + "/cmd_vel";
-  
+
   // Add ROS topic for velocity control
-  m_vel_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1, 
+  m_vel_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1,
                                                             boost::bind(&GenericControlPlugin::velocityCB, this, _1, joint)));
 
   // Create PID parameter for velocity controller
   m_joint_controller->SetVelocityPID(joint->GetScopedName(), pid_param);
-  
+
   // Initialize controller with zero velocity
   m_joint_controller->SetVelocityTarget(joint->GetScopedName(), 0.0);
-  
+
   ROS_INFO("Added new velocity controller for joint %s", joint->GetName().c_str());
 }
 
@@ -304,6 +324,7 @@ void GenericControlPlugin::sendJointUpdateMsg(const physics::JointPtr &joint)
     this->jointPub_default->Publish(_msg, true);
   }
 }
+
 
 // Register this plugin with the simulator
 GZ_REGISTER_MODEL_PLUGIN(GenericControlPlugin)
