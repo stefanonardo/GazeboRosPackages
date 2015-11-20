@@ -42,31 +42,33 @@ public:
 private:
 
   // check if controller for current joint is specified in SDF and return pointer to sdf element
-  bool existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf, 
+  bool existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf,
                            const physics::JointPtr &joint);
 
+#if GAZEBO_MAJOR_VERSION >= 6
   // check if visual properties (for client-side animation of models) exist, and return a pointer to the SDF element
   bool existsVisualSDF(sdf::ElementPtr &sdf_visual_def, const sdf::ElementPtr& sdf,
                        const physics::JointPtr& joint);
-  
+#endif
+
   // get PID controller values from SDF
   common::PID getControllerPID(const sdf::ElementPtr &sdf_ctrl_def);
-  
+
   // get controller type from SDF
   std::string getControllerType(const sdf::ElementPtr &sdf_ctrl_def);
-  
+
   // Method for creating a position controller for a given joint
   void createPositionController(const physics::JointPtr &joint, const common::PID &pid_param);
-  
+
   // Method for creating a velocity controller for a given joint
   void createVelocityController(const physics::JointPtr &joint, const common::PID &pid_param);
-  
+
   // Generic position command callback function (ROS topic)
   void positionCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint);
 
   // Generic velocity command callback function (ROS topic)
   void velocityCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint);
-  
+
   // ROS node handle
   ros::NodeHandle m_nh;
 
@@ -86,9 +88,11 @@ private:
   std::vector<ros::Subscriber> m_pos_sub_vec;
   std::vector<ros::Subscriber> m_vel_sub_vec;
 
+#if GAZEBO_MAJOR_VERSION >= 6
   // Maps for joint names and rotation axes (visual properties for client-side animation)
   std::map<std::string, std::string> m_joint_name_mappings;
   std::map<std::string, geometry_msgs::Vector3> m_joint_axis_mappings;
+#endif
 
   /// \brief keep track of controller update sim-time.
   private: gazebo::common::Time lastControllerUpdateTime;
@@ -96,15 +100,9 @@ private:
   /// \brief Controller update mutex.
   private: std::mutex mutex;
 
-  // Gazebo node
-  private: transport::NodePtr node;
-  // Gazebo joint message publisher
-  private: transport::PublisherPtr jointPub_default;
-
-  private: void sendJointUpdateMsg(const physics::JointPtr &joint);
   // ROS joint state publisher
-  ros::Publisher m_joint_state_pub;
-  sensor_msgs::JointState m_js;
+  private: ros::Publisher m_joint_state_pub;
+  private: sensor_msgs::JointState m_js;
 
 };
 

@@ -78,6 +78,7 @@ include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
+  ${TBB_INCLUDE_DIR}
 )
 
 ## Declare a cpp library

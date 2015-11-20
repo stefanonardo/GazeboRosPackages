@@ -2,7 +2,7 @@
  * Desc: Gazebo plugin providing generic controllers for robot joints
  * This plugin provides ROS topics to control single joints of the robot. The controlled joints can be specified in the SDF as plugin tags
  * Author: Lars Pfotzer
- */ 
+ */
 
 #include "generic_controller_plugin.h"
 
@@ -44,13 +44,13 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
     physics::JointPtr joint = joint_iter->second;
     sdf::ElementPtr sdf_ctrl_def;
 
-    // check, if controller for current joint was specified in the SDF and return sdf element pointer to controller 
+    // check, if controller for current joint was specified in the SDF and return sdf element pointer to controller
     if (existsControllerSDF(sdf_ctrl_def, sdf, joint))
     {
       // get controller parameter from sdf file
       common::PID ctrl_pid = getControllerPID(sdf_ctrl_def);
       std::string ctrl_type = getControllerType(sdf_ctrl_def);
-      
+
       // create controller regarding the specified controller type
       if (ctrl_type == "position")
       {
@@ -62,6 +62,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
       }
     }
 
+#if GAZEBO_MAJOR_VERSION >= 6
     sdf::ElementPtr sdf_visual_def;
     if (existsVisualSDF(sdf_visual_def, sdf, joint))
     {
@@ -71,6 +72,8 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
       if (joint_name_element != NULL)
       {
         this->m_joint_name_mappings[joint->GetName()] = sdf_visual_def->GetValueString();
+
+        joint->SetMappedName(joint_name_element->GetValueString());
       }
 
       if (joint_axis_element != NULL)
@@ -82,8 +85,16 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
         joint_axis_ros.z = joint_axis.z;
 
         this->m_joint_axis_mappings[joint->GetName()] = joint_axis_ros;
+
+        gazebo::math::Vector3 rotation_axis(joint_axis.x, joint_axis.y, joint_axis.z);
+        joint->SetMappedRotationAxis(rotation_axis);
       }
+
+      // Presence of name mapping triggers push-notification of joint state
+      if (joint_name_element != NULL)
+        joint->SetPushState(true);
     }
+#endif
   }
 
   // Controller time control.
@@ -99,11 +110,6 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 
   // Listen to the update event. This event is broadcast every simulation iteration.
   m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
-
-  this->node = transport::NodePtr(new transport::Node());
-  this->node->Init(this->m_model->GetWorld()->GetName());
-
-  this->jointPub_default = this->node->Advertise<msgs::Joint>( "/gazebo/default/joint_updates", 10, 60 );
   this->m_joint_state_pub = m_nh.advertise<sensor_msgs::JointState>( "joint_states", 10 );
 
 }
@@ -129,8 +135,6 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
       m_js.position[curr_ind] = joint->GetAngle(0).Radian();
       m_js.velocity[curr_ind] = joint->GetVelocity(0);
       m_js.effort[curr_ind] = joint->GetForce(0);
-
-      sendJointUpdateMsg(joint);
     }
 
     m_joint_state_pub.publish ( m_js );
@@ -141,7 +145,7 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 
 ///////////////////////////////////////// SDF parser functions ////////////////////////////////////////////
 
-bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf, 
+bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf,
                                                const physics::JointPtr &joint)
 {
   sdf::ElementPtr sdf_ctrl = sdf->GetElement("controller");
@@ -169,11 +173,12 @@ bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, co
       return false;
     }
   }
-  
+
   ROS_WARN("No controller for joint %s found", joint->GetName().c_str());
   return false;
 }
 
+#if GAZEBO_MAJOR_VERSION >= 6
 bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, const sdf::ElementPtr& sdf,
                                               const physics::JointPtr& joint)
 {
@@ -204,6 +209,7 @@ bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, cons
 
   return false;
 }
+#endif
 
 common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ctrl_def)
 {
@@ -301,30 +307,6 @@ void GenericControlPlugin::velocityCB(const std_msgs::Float64::ConstPtr &msg, co
   m_joint_controller->SetVelocityTarget(joint->GetScopedName(), velocity_m_per_sec);
   //pid.SetCmd(velocity_m_per_sec);
 }
-
-void GenericControlPlugin::sendJointUpdateMsg(const physics::JointPtr &joint)
-{
-  gazebo::msgs::Joint _msg;
-
-  joint->FillMsg(_msg);
-
-  if (!_msg.IsInitialized())
-  {
-    std::vector<std::string> init_errors;
-    _msg.FindInitializationErrors(&init_errors);
-
-    std::cout << " failed to initialize joint message, not sending: errors = " << init_errors.size() << std::endl;
-    for (std::vector<std::string>::const_iterator it = init_errors.begin(); it != init_errors.end(); it++)
-      std::cout << *it << ";";
-
-    std::cout << std::endl;
-  }
-  else
-  {
-    this->jointPub_default->Publish(_msg, true);
-  }
-}
-
 
 // Register this plugin with the simulator
 GZ_REGISTER_MODEL_PLUGIN(GenericControlPlugin)
