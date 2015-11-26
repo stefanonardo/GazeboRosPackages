@@ -59,6 +59,7 @@ done
 if [ "$INSTALL_DEPENDENCIES" == "true" ]; then
   echo "\nInstalling build dependencies \n"
   yum install $DEPENDENCIES
+  exit 0
 fi
 
 # We need python 2.7
