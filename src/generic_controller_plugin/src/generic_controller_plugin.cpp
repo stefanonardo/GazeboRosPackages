@@ -62,7 +62,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
       }
     }
 
-#if GAZEBO_MAJOR_VERSION >= 6
+#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
     sdf::ElementPtr sdf_visual_def;
     if (existsVisualSDF(sdf_visual_def, sdf, joint))
     {
@@ -178,7 +178,7 @@ bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, co
   return false;
 }
 
-#if GAZEBO_MAJOR_VERSION >= 6
+#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
 bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, const sdf::ElementPtr& sdf,
                                               const physics::JointPtr& joint)
 {
