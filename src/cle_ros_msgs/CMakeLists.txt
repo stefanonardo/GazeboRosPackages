@@ -53,6 +53,7 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
    FILES
+   CreateNewSimulation.srv
    DeleteTransferFunction.srv
    GetBrain.srv
    GetSimulationState.srv
@@ -62,7 +63,6 @@ add_service_files(
    IsSimulationRunning.srv
    SetBrain.srv
    SetTransferFunction.srv
-   StartNewSimulation.srv
    Trigger.srv
 )
 
