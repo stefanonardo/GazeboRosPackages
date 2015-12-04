@@ -54,6 +54,7 @@ add_message_files(
 add_service_files(
    FILES
    CreateNewSimulation.srv
+   StartNewSimulation.srv
    DeleteTransferFunction.srv
    GetBrain.srv
    GetSimulationState.srv
