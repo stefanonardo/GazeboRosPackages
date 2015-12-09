@@ -86,6 +86,8 @@
 #include "gazebo_msgs/GetLightProperties.h"
 #include "gazebo_msgs/SetLightProperties.h"
 #include "gazebo_msgs/ExportWorldSDF.h"
+#include "gazebo_msgs/GetLightsName.h"
+#include "gazebo_msgs/DeleteLight.h"
 
 // Topics
 #include "gazebo_msgs/ModelState.h"
@@ -255,6 +257,9 @@ public:
   /// \brief
   bool deleteLights(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
 
+  /// \brief delete a given light by name
+  bool deleteLight(gazebo_msgs::DeleteLight::Request &req,gazebo_msgs::DeleteLight::Response &res);
+
   // patched for HBP
   /// \brief
   bool getVisualProperties(gazebo_msgs::GetVisualProperties::Request &req, gazebo_msgs::GetVisualProperties::Response &res);
@@ -266,6 +271,10 @@ public:
   // patched for HBP
   /// \brief
   bool getLightProperties(gazebo_msgs::GetLightProperties::Request &req, gazebo_msgs::GetLightProperties::Response &res);
+
+  // patched for HBP
+  /// \brief
+  bool getLightsName(gazebo_msgs::GetLightsName::Request &req, gazebo_msgs::GetLightsName::Response &res);
 
   // Patched for HBP
   /// \brief
@@ -452,7 +461,9 @@ private:
   ros::ServiceServer reset_sim_service_; // patched for HBP
   ros::ServiceServer end_world_service_; // patched for HBP
   ros::ServiceServer delete_lights_service_; // patched for HBP
+  ros::ServiceServer delete_light_service_; // patched for HBP
   ros::ServiceServer get_object_properties_service_; // patched for HBP
+  ros::ServiceServer get_lights_name_service_; // patched for HBP
   ros::ServiceServer set_object_properties_service_; // patched for HBP
   ros::ServiceServer get_light_properties_service_;  // patched for HBP
   ros::ServiceServer set_light_properties_service_;  // patched for HBP

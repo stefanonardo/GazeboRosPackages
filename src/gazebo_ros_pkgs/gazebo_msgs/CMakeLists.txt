@@ -52,6 +52,8 @@ add_service_files(DIRECTORY srv FILES
   GetLightProperties.srv
   SetLightProperties.srv
   ExportWorldSDF.srv
+  GetLightsName.srv
+  DeleteLight.srv
   )
 
 generate_messages(DEPENDENCIES

@@ -475,6 +475,15 @@ void GazeboRosApiPlugin::advertiseServices()
   delete_lights_service_ = nh_->advertiseService(delete_lights_aso);
 
   // patched for HBP
+  std::string delete_light_service_name("delete_light");
+  ros::AdvertiseServiceOptions delete_light_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::DeleteLight>(
+                                                          delete_light_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::deleteLight,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  delete_light_service_ = nh_->advertiseService(delete_light_aso);
+
+  // patched for HBP
   // Advertise more services on the custom queue
   std::string get_object_properties_service_name("get_visual_properties");
   ros::AdvertiseServiceOptions get_object_properties_aso =
@@ -503,6 +512,16 @@ void GazeboRosApiPlugin::advertiseServices()
                                                           boost::bind(&GazeboRosApiPlugin::getLightProperties,this,_1,_2),
                                                           ros::VoidPtr(), &gazebo_queue_);
   get_light_properties_service_ = nh_->advertiseService(get_light_properties_aso);
+
+  // patched for HBP
+  // Advertise more services on the custom queue
+  std::string get_lights_name_service_name("get_lights_name");
+  ros::AdvertiseServiceOptions get_lights_name_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetLightsName>(
+                                                          get_lights_name_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::getLightsName,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  get_lights_name_service_ = nh_->advertiseService(get_lights_name_aso);
 
   // patched for HBP
   // Advertise more services on the custom queue
@@ -1610,6 +1629,52 @@ bool GazeboRosApiPlugin::deleteLights(std_srvs::Empty::Request &req,std_srvs::Em
 }
 
 // patched for HBP
+bool GazeboRosApiPlugin::deleteLight(gazebo_msgs::DeleteLight::Request &req,gazebo_msgs::DeleteLight::Response &res)
+{
+  gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest("entity_delete", req.light_name);
+  request_pub_->Publish(*msg,true);
+
+  // \brief poll and wait, verify that the model is deleted within Hardcoded 10 seconds
+  // see deleteModel and spawnAndConform
+  ros::Duration model_spawn_timeout(10.0);
+  ros::Time timeout = ros::Time::now() + model_spawn_timeout;
+
+  while (true)
+  {
+    if (ros::Time::now() > timeout)
+    {
+      res.success = false;
+      res.status_message =
+        std::string("DeleteLight: light pushed to delete queue, but delete service timed out waiting for model to disappear from simulation");
+      return true;
+    }
+
+    //boost::recursive_mutex::scoped_lock lock(*world->GetMRMutex());
+
+    const msgs::Scene &sceneMsg = world_->GetSceneMsg();
+    const int size = sceneMsg.light_size();
+    bool found = false;
+    // Check if the light is still in the scene
+    for (unsigned int i = 0; !found && i < size; ++i)
+    {
+        if (sceneMsg.light(i).name().compare(req.light_name) == 0)
+        {
+            found = true;
+        }
+    }
+    if (!found) {
+        break; //the light isn't in the scene anymore, it has been deleted.
+    }
+
+    usleep(1000);
+   }
+
+  res.status_message = "DeleteLight: " + req.light_name + " successfully deleted" ;
+  res.success = true;
+  return true;
+}
+
+// patched for HBP
 bool GazeboRosApiPlugin::getVisualProperties(gazebo_msgs::GetVisualProperties::Request &req,
                                              gazebo_msgs::GetVisualProperties::Response &res)
 {
@@ -1733,6 +1798,33 @@ bool GazeboRosApiPlugin::getLightProperties(gazebo_msgs::GetLightProperties::Req
 
   res.success = false;
   res.status_message = std::string("getLightProperties: Requested light ") + req.light_name + std::string(" not found!");
+
+  return true;
+}
+
+
+// patched for HBP
+bool GazeboRosApiPlugin::getLightsName(gazebo_msgs::GetLightsName::Request &req, gazebo_msgs::GetLightsName::Response &res)
+{
+
+  // request and wait for scene update
+  if (!requestSceneUpdate())
+  {
+    res.success = false;
+    res.status_message = std::string("getLightsName: Scene update requested but timed out");
+    return true;
+  }
+
+  res.light_names.clear();
+  LightIter light = gazeboscene_.mutable_light()->begin();
+
+  for (; light != gazeboscene_.mutable_light()->end(); light++)
+  {
+    res.light_names.push_back(light->name());
+  }
+
+  res.success = true;
+  res.status_message = std::string("getLightsName: got Lights");
 
   return true;
 }
@@ -2824,7 +2916,7 @@ bool GazeboRosApiPlugin::requestSceneUpdate()
   gazebo::msgs::Request *scene_info_msg = gazebo::msgs::CreateRequest("scene_info", "");
   request_pub_->Publish(*scene_info_msg, true);
 
-  // wait unitl updated scene arrived
+  // wait until updated scene arrived
   ros::Duration scene_update_timeout(10.0);
   ros::Time timeout = ros::Time::now() + scene_update_timeout;
 
