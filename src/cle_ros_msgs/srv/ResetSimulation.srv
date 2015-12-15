@@ -1,0 +1,5 @@
+bool reset_robot_pose		# Whether to reset the initial robot pose or not
+bool full_reset				# Whether to fully reset the simulation or not
+---
+bool success				# True if the service run correctly, False otherwise
+string error_message		# Useful possible comment for debug purposes

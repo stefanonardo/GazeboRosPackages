@@ -62,6 +62,7 @@ add_service_files(
    GetVersion.srv
    Health.srv
    IsSimulationRunning.srv
+   ResetSimulation.srv
    SetBrain.srv
    SetTransferFunction.srv
    Trigger.srv
