@@ -26,6 +26,7 @@
 
 #include <string>
 
+#include <gazebo/common/Events.hh>
 #include <gazebo/sensors/Sensor.hh>
 #include <gazebo/sensors/CameraSensor.hh>
 #include <gazebo/sensors/SensorTypes.hh>
@@ -45,6 +46,9 @@ GazeboRosCamera::GazeboRosCamera()
 // Destructor
 GazeboRosCamera::~GazeboRosCamera()
 {
+#if GAZEBO_MAJOR_VERSION >= 6
+  event::Events::DisconnectWorldReset(this->resetEventConnection);
+#endif
   ROS_DEBUG_STREAM_NAMED("camera","Unloaded");
 }
 
@@ -66,6 +70,11 @@ void GazeboRosCamera::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   this->depth_ = this->depth;
   this->format_ = this->format;
   this->camera_ = this->camera;
+
+#if GAZEBO_MAJOR_VERSION >= 6
+  // Connect to the reset event.
+  this->resetEventConnection = event::Events::ConnectWorldReset(boost::bind(&CameraPlugin::Reset, this));
+#endif
 
   GazeboRosCameraUtils::Load(_parent, _sdf);
 }
@@ -104,4 +113,4 @@ void GazeboRosCamera::Reset() {
   this->last_update_time_ = 0.0;
 }
 
-}
+} // end namespace gazebo

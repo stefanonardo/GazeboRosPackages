@@ -27,6 +27,7 @@
 // library for processing camera data for gazebo / ros conversions
 #include <gazebo/plugins/CameraPlugin.hh>
 
+#include <gazebo/transport/Subscriber.hh>
 #include <gazebo_plugins/gazebo_ros_camera_utils.h>
 
 namespace gazebo
@@ -46,6 +47,9 @@ namespace gazebo
 
     /// \brief Sensor reset
     public: void Reset();
+
+    /// \brief Connection pointer for reset event
+    public: event::ConnectionPtr resetEventConnection;
 
     /// \brief Update the controller
     protected: virtual void OnNewFrame(const unsigned char *_image,
