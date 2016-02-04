@@ -73,8 +73,11 @@ void GazeboRosLaser::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   this->sdf = _sdf;
 
   this->parent_ray_sensor_ =
+#if GAZEBO_MAJOR_VERSION <= 6
     boost::dynamic_pointer_cast<sensors::RaySensor>(_parent);
-
+#else
+    std::dynamic_pointer_cast<sensors::RaySensor>(_parent);
+#endif
   if (!this->parent_ray_sensor_)
     gzthrow("GazeboRosLaser controller requires a Ray Sensor as its parent");
 

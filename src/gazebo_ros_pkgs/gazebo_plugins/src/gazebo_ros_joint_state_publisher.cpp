@@ -29,6 +29,10 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string.hpp>
+
 using namespace gazebo;
 
 GazeboRosJointStatePublisher::GazeboRosJointStatePublisher() {}
