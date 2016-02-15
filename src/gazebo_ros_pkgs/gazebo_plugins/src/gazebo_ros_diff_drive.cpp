@@ -100,10 +100,14 @@ void GazeboRosDiffDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _sdf 
     joints_.resize ( 2 );
     joints_[LEFT] = gazebo_ros_->getJoint ( parent, "leftJoint", "left_joint" );
     joints_[RIGHT] = gazebo_ros_->getJoint ( parent, "rightJoint", "right_joint" );
+    
+#if GAZEBO_MAJOR_VERSION <= 6
     joints_[LEFT]->SetMaxForce ( 0, wheel_torque );
     joints_[RIGHT]->SetMaxForce ( 0, wheel_torque );
-
-
+#else
+    joints_[LEFT]->SetEffortLimit ( 0, wheel_torque );
+    joints_[RIGHT]->SetEffortLimit ( 0, wheel_torque );
+#endif
 
     this->publish_tf_ = true;
     if (!_sdf->HasElement("publishTf")) {

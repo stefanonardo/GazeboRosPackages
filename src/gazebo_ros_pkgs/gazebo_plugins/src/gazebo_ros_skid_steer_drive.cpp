@@ -256,11 +256,18 @@ namespace gazebo {
 	 gzthrow(error);
    }
 
+#if GAZEBO_MAJOR_VERSION <= 6
     joints[LEFT_FRONT]->SetMaxForce(0, torque);
     joints[RIGHT_FRONT]->SetMaxForce(0, torque);
     joints[LEFT_REAR]->SetMaxForce(0, torque);
     joints[RIGHT_REAR]->SetMaxForce(0, torque);
-
+#else
+    joints[LEFT_FRONT]->SetEffortLimit(0, torque);
+    joints[RIGHT_FRONT]->SetEffortLimit(0, torque);
+    joints[LEFT_REAR]->SetEffortLimit(0, torque);
+    joints[RIGHT_REAR]->SetEffortLimit(0, torque);
+#endif
+    
     // Make sure the ROS node for Gazebo has already been initialized
     if (!ros::isInitialized())
     {

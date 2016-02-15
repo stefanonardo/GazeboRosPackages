@@ -41,14 +41,25 @@ void MultiCameraPlugin::Load(sensors::SensorPtr _sensor,
     gzerr << "Invalid sensor pointer.\n";
 
   this->parentSensor =
+#if GAZEBO_MAJOR_VERSION <= 6  
     boost::dynamic_pointer_cast<sensors::MultiCameraSensor>(_sensor);
-
+#else
+    std::dynamic_pointer_cast<sensors::MultiCameraSensor>(_sensor);
+#endif
   if (!this->parentSensor)
   {
     gzerr << "MultiCameraPlugin requires a CameraSensor.\n";
+#if GAZEBO_MAJOR_VERSION <= 6  
     if (boost::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
+#else
+    if (std::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
+#endif      
       gzmsg << "It is a depth camera sensor\n";
-    if (boost::dynamic_pointer_cast<sensors::CameraSensor>(_sensor))
+#if GAZEBO_MAJOR_VERSION <= 6  
+    if (boost::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
+#else
+    if (std::dynamic_pointer_cast<sensors::DepthCameraSensor>(_sensor))
+#endif
       gzmsg << "It is a camera sensor\n";
   }
 

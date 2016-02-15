@@ -86,8 +86,12 @@ void GazeboRosBlockLaser::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   this->node_ = transport::NodePtr(new transport::Node());
   this->node_->Init(worldName);
 
+#if GAZEBO_MAJOR_VERSION <= 6
   this->parent_ray_sensor_ = boost::dynamic_pointer_cast<sensors::RaySensor>(this->parent_sensor_);
-
+#else
+  this->parent_ray_sensor_ = std::dynamic_pointer_cast<sensors::RaySensor>(this->parent_sensor_);
+#endif
+  
   if (!this->parent_ray_sensor_)
     gzthrow("GazeboRosBlockLaser controller requires a Ray Sensor as its parent");
 
@@ -230,9 +234,10 @@ void GazeboRosBlockLaser::PutLaserData(common::Time &_updateTime)
 
   this->parent_ray_sensor_->SetActive(false);
 
+#if GAZEBO_MAJOR_VERSION <= 6
   math::Angle maxAngle = this->parent_ray_sensor_->GetAngleMax();
   math::Angle minAngle = this->parent_ray_sensor_->GetAngleMin();
-
+  
   double maxRange = this->parent_ray_sensor_->GetRangeMax();
   double minRange = this->parent_ray_sensor_->GetRangeMin();
   int rayCount = this->parent_ray_sensor_->GetRayCount();
@@ -242,6 +247,21 @@ void GazeboRosBlockLaser::PutLaserData(common::Time &_updateTime)
   int verticalRangeCount = this->parent_ray_sensor_->GetVerticalRangeCount();
   math::Angle verticalMaxAngle = this->parent_ray_sensor_->GetVerticalAngleMax();
   math::Angle verticalMinAngle = this->parent_ray_sensor_->GetVerticalAngleMin();
+#else
+  math::Angle maxAngle = this->parent_ray_sensor_->AngleMax();
+  math::Angle minAngle = this->parent_ray_sensor_->AngleMin();
+  
+  double maxRange = this->parent_ray_sensor_->RangeMax();
+  double minRange = this->parent_ray_sensor_->RangeMin();
+  int rayCount = this->parent_ray_sensor_->RayCount();
+  int rangeCount = this->parent_ray_sensor_->RangeCount();
+
+  int verticalRayCount = this->parent_ray_sensor_->VerticalRayCount();
+  int verticalRangeCount = this->parent_ray_sensor_->VerticalRangeCount();
+  math::Angle verticalMaxAngle = this->parent_ray_sensor_->VerticalAngleMax();
+  math::Angle verticalMinAngle = this->parent_ray_sensor_->VerticalAngleMin();
+#endif
+
 
   double yDiff = maxAngle.Radian() - minAngle.Radian();
   double pDiff = verticalMaxAngle.Radian() - verticalMinAngle.Radian();

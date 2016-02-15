@@ -251,22 +251,38 @@ void HuskyPlugin::UpdateChild()
   if (set_joints_[BL])
   {
     joints_[BL]->SetVelocity( 0, wheel_speed_[BL] / (wd/2.0) );
+#if GAZEBO_MAJOR_VERSION <= 6
     joints_[BL]->SetMaxForce( 0, torque_ );
+#else
+    joints_[BL]->SetEffortLimit( 0, torque_ );
+#endif
   }
   if (set_joints_[BR])
   {
     joints_[BR]->SetVelocity( 0, wheel_speed_[BR] / (wd / 2.0) );
+#if GAZEBO_MAJOR_VERSION <= 6
     joints_[BR]->SetMaxForce( 0, torque_ );
+#else
+    joints_[BR]->SetEffortLimit( 0, torque_ );
+#endif
   }
   if (set_joints_[FL])
   {
     joints_[FL]->SetVelocity( 0, wheel_speed_[FL] / (wd / 2.0) );
+#if GAZEBO_MAJOR_VERSION <= 6
     joints_[FL]->SetMaxForce( 0, torque_ );
+#else
+    joints_[FL]->SetEffortLimit( 0, torque_ );
+#endif
   }
   if (set_joints_[FR])
   {
     joints_[FR]->SetVelocity( 0, wheel_speed_[FR] / (wd / 2.0) );
+#if GAZEBO_MAJOR_VERSION <= 6
     joints_[FR]->SetMaxForce( 0, torque_ );
+#else
+    joints_[FR]->SetEffortLimit( 0, torque_ );
+#endif
   }
 
   nav_msgs::Odometry odom;

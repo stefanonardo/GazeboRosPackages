@@ -108,9 +108,13 @@ void GazeboRosTricycleDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _
     odomOptions["world"] = WORLD;
     gazebo_ros_->getParameter<OdomSource> ( odom_source_, "odometrySource", odomOptions, WORLD );
 
+#if GAZEBO_MAJOR_VERSION <= 6
     joint_wheel_actuated_->SetMaxForce ( 0, wheel_torque_ );
     joint_steering_->SetMaxForce ( 0, wheel_torque_ );
-
+#else
+    joint_wheel_actuated_->SetEffortLimit ( 0, wheel_torque_ );
+    joint_steering_->SetEffortLimit ( 0, wheel_torque_ );
+#endif
 
     // Initialize update rate stuff
     if ( this->update_rate_ > 0.0 ) this->update_period_ = 1.0 / this->update_rate_;
