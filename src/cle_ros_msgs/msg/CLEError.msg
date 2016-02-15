@@ -1,5 +1,9 @@
 # This message contains information on a error raised after a user update of some CLE related source code:
 # Transfer function, Smach script, PyNN script
+int32 severity # error severity according to the following constants
+int32 SEVERITY_WARNING=0  # The error might not affect the simulation at all
+int32 SEVERITY_ERROR=1    # The error will lead to a simulation failure if not resolved
+int32 SEVERITY_CRITICAL=2 # The error has lead to simulation failure
 
 string sourceType # e.g., "Transfer Function"
 string errorType # e.g., "NoOrMultipleNames", "Compile", "Loading", "Runtime"
