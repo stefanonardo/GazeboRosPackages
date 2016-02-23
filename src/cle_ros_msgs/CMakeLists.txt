@@ -42,12 +42,14 @@ find_package(catkin REQUIRED message_generation std_msgs)
 ## Generate messages in the 'msg' folder
 add_message_files(
    FILES
-   SpikeCount.msg
-   SpikeRate.msg
-   SpikeEvent.msg
-   SpikeData.msg
    CLEError.msg
+   NeuronParameter.msg
+   PopulationInfo.msg
    SimulationMetrics.msg
+   SpikeCount.msg
+   SpikeData.msg
+   SpikeEvent.msg
+   SpikeRate.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -57,6 +59,7 @@ add_service_files(
    StartNewSimulation.srv
    DeleteTransferFunction.srv
    GetBrain.srv
+   GetPopulations.srv
    GetSimulationState.srv
    GetTransferFunctions.srv
    GetVersion.srv
