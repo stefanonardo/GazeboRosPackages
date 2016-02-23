@@ -1,0 +1,8 @@
+<!-- Starts up everything. -->
+<launch>
+  <node pkg="ros_cpg_wrapper" type="CpgRosNode.py" name="CpgRosNode">
+    <param name="rate" value="10.0"/>
+  </node>
+
+  <include file="$(find ros_cpg_wrapper)/launch/tools.launch"/>
+</launch>
