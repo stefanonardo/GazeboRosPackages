@@ -114,6 +114,8 @@ catkin_make \
 -DBoost_LIBRARY_DIRS=$BOOST_LIBDIR \
 -DBoost_NO_BOOST_CMAKE=true \
 -DTBB_INCLUDE_DIR=$TBB_INCLUDE_DIR \
+-DPYTHON_INCLUDE_DIR=/opt/rh/python27/root/usr/include/python2.7 \
+-DPYTHON_LIBRARY=/opt/rh/python27/root/usr/lib64/libpython2.7.so \
 -DBOOST_SIGNALS_NO_DEPRECATION_WARNING=true
 
 if [ "$DEPLOY" == "true" ]; then
