@@ -43,6 +43,7 @@ find_package(catkin REQUIRED message_generation std_msgs)
 add_message_files(
    FILES
    CLEError.msg
+   CSVRecordedFile.msg
    NeuronParameter.msg
    PopulationInfo.msg
    SimulationMetrics.msg
@@ -59,6 +60,7 @@ add_service_files(
    StartNewSimulation.srv
    DeleteTransferFunction.srv
    GetBrain.srv
+   GetCSVRecordersFiles.srv
    GetPopulations.srv
    GetSimulationState.srv
    GetTransferFunctions.srv
