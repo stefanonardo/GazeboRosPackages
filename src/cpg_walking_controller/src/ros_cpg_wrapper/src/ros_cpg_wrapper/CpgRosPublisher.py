@@ -149,7 +149,7 @@ class CpgRosPublisher:
         for joint, angle in self._joints_angles.iteritems():
             message = Float64()
             message.data = angle
-            message_publisher = rospy.Publisher('cheesy5/' + joint  + '/cmd_pos', Float64, queue_size=10)
+            message_publisher = rospy.Publisher('robot/' + joint  + '/cmd_pos', Float64, queue_size=10)
             message_publisher.publish(message)
             #message_publisher_vel = rospy.Publisher('cheesy5/' + joint  + '/cmd_vel', Float64, queue_size=10)
             #message_publisher_vel.publish(message)
