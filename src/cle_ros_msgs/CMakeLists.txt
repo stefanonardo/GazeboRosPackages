@@ -44,6 +44,7 @@ add_message_files(
    FILES
    CLEError.msg
    CSVRecordedFile.msg
+   ExperimentPopulationInfo.msg
    NeuronParameter.msg
    PopulationInfo.msg
    SimulationMetrics.msg
