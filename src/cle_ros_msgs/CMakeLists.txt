@@ -47,6 +47,7 @@ add_message_files(
    ExperimentPopulationInfo.msg
    NeuronParameter.msg
    PopulationInfo.msg
+   SimulationLifecycleStateChange.msg
    SimulationMetrics.msg
    SpikeCount.msg
    SpikeData.msg
