@@ -39,6 +39,7 @@ find_package(gazebo REQUIRED)
 
 find_package(Boost REQUIRED COMPONENTS thread)
 
+add_definitions(-DTIXML_USE_STL)
 find_package(TinyXML REQUIRED)
 
 catkin_python_setup()
