@@ -20,11 +20,6 @@
 
 #include <mutex>
 
-// Version check for joint update message support: Restrict to specific Gazebo version 6.0.6 the EPFL repository version has 'forked' from
-#if GAZEBO_MAJOR_VERSION == 6 && GAZEBO_MINOR_VERSION == 0 && GAZEBO_PATCH_VERSION == 6
-#define GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
-#endif
-
 namespace gazebo
 {
 
@@ -50,11 +45,9 @@ private:
   bool existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, const sdf::ElementPtr &sdf,
                            const physics::JointPtr &joint);
 
-#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
   // check if visual properties (for client-side animation of models) exist, and return a pointer to the SDF element
   bool existsVisualSDF(sdf::ElementPtr &sdf_visual_def, const sdf::ElementPtr& sdf,
                        const physics::JointPtr& joint);
-#endif
 
   // get PID controller values from SDF
   common::PID getControllerPID(const sdf::ElementPtr &sdf_ctrl_def);
@@ -93,11 +86,9 @@ private:
   std::vector<ros::Subscriber> m_pos_sub_vec;
   std::vector<ros::Subscriber> m_vel_sub_vec;
 
-#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
   // Maps for joint names and rotation axes (visual properties for client-side animation)
   std::map<std::string, std::string> m_joint_name_mappings;
   std::map<std::string, geometry_msgs::Vector3> m_joint_axis_mappings;
-#endif
 
   /// \brief keep track of controller update sim-time.
   private: gazebo::common::Time lastControllerUpdateTime;

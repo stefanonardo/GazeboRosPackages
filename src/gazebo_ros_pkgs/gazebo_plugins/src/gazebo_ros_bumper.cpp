@@ -138,7 +138,11 @@ void GazeboRosBumper::OnContact()
     return;
 
   msgs::Contacts contacts;
+#if GAZEBO_MAJOR_VERSION > 6
+  contacts = this->parentSensor->Contacts();
+#else
   contacts = this->parentSensor->GetContacts();
+#endif
   /// \TODO: need a time for each Contact in i-loop, they may differ
   this->contact_state_msg_.header.frame_id = this->frame_name_;
   this->contact_state_msg_.header.stamp = ros::Time(contacts.time().sec(),

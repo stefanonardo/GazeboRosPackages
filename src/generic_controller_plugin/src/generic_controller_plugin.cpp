@@ -10,12 +10,6 @@
 #include <sensor_msgs/JointState.h>
 #include <ros/time.h>
 
-#if SDF_MAJOR_VERSION == 3
-  #pragma message "INFO: Using SDF v3 - Redefining some SDF v2 getters"
-  #define GetValueVector3 Get<sdf::Vector3>
-  #define GetValueString Get<std::string>
-#endif
-
 namespace gazebo
 {
 
@@ -62,7 +56,6 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
       }
     }
 
-#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
     sdf::ElementPtr sdf_visual_def;
     if (existsVisualSDF(sdf_visual_def, sdf, joint))
     {
@@ -71,13 +64,23 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 
       if (joint_name_element != NULL)
       {
-        this->m_joint_name_mappings[joint->GetName()] = sdf_visual_def->GetValueString();
+        this->m_joint_name_mappings[joint->GetName()] = sdf_visual_def->Get<std::string>();
 
-        joint->SetMappedName(joint_name_element->GetValueString());
+        joint->SetMappedName(joint_name_element->Get<std::string>());
       }
 
       if (joint_axis_element != NULL)
       {
+#if SDF_MAJOR_VERSION > 3 && GAZEBO_MAJOR_VERSION > 6
+        ignition::math::Vector3d joint_axis = joint_axis_element->Get<ignition::math::Vector3d>();
+        geometry_msgs::Vector3 joint_axis_ros;
+        joint_axis_ros.x = joint_axis.X();
+        joint_axis_ros.y = joint_axis.Y();
+        joint_axis_ros.z = joint_axis.Z();
+
+        this->m_joint_axis_mappings[joint->GetName()] = joint_axis_ros;
+        joint->SetMappedRotationAxis(joint_axis);
+#else
         sdf::Vector3 joint_axis = joint_axis_element->GetValueVector3();
         geometry_msgs::Vector3 joint_axis_ros;
         joint_axis_ros.x = joint_axis.x;
@@ -85,16 +88,15 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
         joint_axis_ros.z = joint_axis.z;
 
         this->m_joint_axis_mappings[joint->GetName()] = joint_axis_ros;
-
         gazebo::math::Vector3 rotation_axis(joint_axis.x, joint_axis.y, joint_axis.z);
         joint->SetMappedRotationAxis(rotation_axis);
+#endif
       }
 
       // Presence of name mapping triggers push-notification of joint state
       if (joint_name_element != NULL)
         joint->SetPushState(true);
     }
-#endif
   }
 
   // Controller time control.
@@ -178,7 +180,6 @@ bool GenericControlPlugin::existsControllerSDF(sdf::ElementPtr &sdf_ctrl_def, co
   return false;
 }
 
-#ifdef GAZEBO_HBP_SUPPORT_JOINT_STATE_MESSAGES
 bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, const sdf::ElementPtr& sdf,
                                               const physics::JointPtr& joint)
 {
@@ -209,7 +210,6 @@ bool GenericControlPlugin::existsVisualSDF(sdf::ElementPtr& sdf_visual_def, cons
 
   return false;
 }
-#endif
 
 common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ctrl_def)
 {
@@ -220,9 +220,15 @@ common::PID GenericControlPlugin::getControllerPID(const sdf::ElementPtr &sdf_ct
     sdf::ElementPtr elem_pid = sdf_ctrl_def->GetElement("pid");
     if (elem_pid != NULL)
     {
+#if SDF_MAJOR_VERSION > 3
+      ignition::math::Vector3d pid_values = elem_pid->Get<ignition::math::Vector3d>();
+      ROS_INFO("Controller PID values p=%f, i=%f, d=%f", pid_values.X(), pid_values.Y(), pid_values.Z());
+      pid_param = common::PID(pid_values.X(), pid_values.Y(), pid_values.Z());
+#else
       sdf::Vector3 pid_values = elem_pid->Get<sdf::Vector3>();
       ROS_INFO("Controller PID values p=%f, i=%f, d=%f", pid_values.x, pid_values.y, pid_values.z);
       pid_param = common::PID(pid_values.x, pid_values.y, pid_values.z);
+#endif
       return pid_param;
     }
   }

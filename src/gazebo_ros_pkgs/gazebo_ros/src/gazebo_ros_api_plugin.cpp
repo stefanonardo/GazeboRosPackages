@@ -1894,11 +1894,19 @@ bool GazeboRosApiPlugin::exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &re
   sdf_parsed.SetFromString(msg.data());
 
   // Check that sdf contains world
+#if SDF_MAJOR_VERSION > 3
+  if (!sdf_parsed.Root()->HasElement("world")) {
+#else
   if (!sdf_parsed.root->HasElement("world")) {
+#endif
     return false;
   }
 
+#if SDF_MAJOR_VERSION > 3
+  res.sdf_dump = sdf_parsed.Root()->ToString("");
+#else
   res.sdf_dump = sdf_parsed.root->ToString("");
+#endif
 
   return true;
 }
