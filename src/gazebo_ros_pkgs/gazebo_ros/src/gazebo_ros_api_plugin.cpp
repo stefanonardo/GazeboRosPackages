@@ -175,7 +175,7 @@ void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
   gazebonode_->Init(world_name);
   //stat_sub_ = gazebonode_->Subscribe("~/world_stats", &GazeboRosApiPlugin::publishSimTime, this); // TODO: does not work in server plugin?
   factory_pub_ = gazebonode_->Advertise<gazebo::msgs::Factory>("~/factory");
-  request_pub_ = gazebonode_->Advertise<gazebo::msgs::Request>("~/request");
+  factory_light_pub_ = gazebonode_->Advertise<gazebo::msgs::Light>("~/factory/light");
   response_sub_ = gazebonode_->Subscribe("~/response",&GazeboRosApiPlugin::onResponse, this);
 
   // reset topic connection counts
@@ -194,6 +194,7 @@ void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
 
 void GazeboRosApiPlugin::onResponse(ConstResponsePtr &response)
 {
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
   if (response->type() == gazeboscene_.GetTypeName())
   {
     gazeboscene_.Clear();
@@ -922,8 +923,7 @@ bool GazeboRosApiPlugin::deleteModel(gazebo_msgs::DeleteModel::Request &req,
   }
 
   // send delete model request
-  gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest("entity_delete",req.model_name);
-  request_pub_->Publish(*msg,true);
+  this->publishRequest("entity_delete", req.model_name);
 
   ros::Duration model_spawn_timeout(60.0);
   ros::Time timeout = ros::Time::now() + model_spawn_timeout;
@@ -1619,11 +1619,11 @@ bool GazeboRosApiPlugin::endWorld(std_srvs::Empty::Request &req,std_srvs::Empty:
 // patched for HBP
 bool GazeboRosApiPlugin::deleteLights(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
 {
+  boost::recursive_mutex::scoped_lock scene_lock(scene_lock_);
   LightIter light = gazeboscene_.mutable_light()->begin();
   for (; light != gazeboscene_.mutable_light()->end(); light++)
   {
-    gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest("entity_delete",light->name());
-    request_pub_->Publish(*msg,true);
+    this->publishRequest("entity_delete", light->name());
   }
   return true;
 }
@@ -1631,8 +1631,7 @@ bool GazeboRosApiPlugin::deleteLights(std_srvs::Empty::Request &req,std_srvs::Em
 // patched for HBP
 bool GazeboRosApiPlugin::deleteLight(gazebo_msgs::DeleteLight::Request &req,gazebo_msgs::DeleteLight::Response &res)
 {
-  gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest("entity_delete", req.light_name);
-  request_pub_->Publish(*msg,true);
+  this->publishRequest("entity_delete", req.light_name);
 
   // \brief poll and wait, verify that the model is deleted within Hardcoded 10 seconds
   // see deleteModel and spawnAndConform
@@ -1777,6 +1776,7 @@ bool GazeboRosApiPlugin::getLightProperties(gazebo_msgs::GetLightProperties::Req
     return true;
   }
 
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
   LightIter light = gazeboscene_.mutable_light()->begin();
   for (; light != gazeboscene_.mutable_light()->end(); light++)
   {
@@ -1816,6 +1816,7 @@ bool GazeboRosApiPlugin::getLightsName(gazebo_msgs::GetLightsName::Request &req,
   }
 
   res.light_names.clear();
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
   LightIter light = gazeboscene_.mutable_light()->begin();
 
   for (; light != gazeboscene_.mutable_light()->end(); light++)
@@ -1843,6 +1844,7 @@ bool GazeboRosApiPlugin::setLightProperties(gazebo_msgs::SetLightProperties::Req
     return true;
   }
 
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
   LightIter light = gazeboscene_.mutable_light()->begin();
   for (; light != gazeboscene_.mutable_light()->end(); light++)
   {
@@ -1857,8 +1859,8 @@ bool GazeboRosApiPlugin::setLightProperties(gazebo_msgs::SetLightProperties::Req
       light->set_attenuation_linear(req.attenuation_linear);
       light->set_attenuation_quadratic(req.attenuation_quadratic);
 
-      // Create a publisher on the ~/light topic
-      gazebo::transport::PublisherPtr light_pub = gazebonode_->Advertise<gazebo::msgs::Light>("~/light");
+      // Create a publisher on the ~/light/modify topic
+      gazebo::transport::PublisherPtr light_pub = gazebonode_->Advertise<gazebo::msgs::Light>("~/light/modify");
       light_pub->Publish(*light);
 
       res.success = true;
@@ -2836,17 +2838,11 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
   std::string gazebo_model_xml_string = stream.str();
   ROS_DEBUG("Gazebo Model XML\n\n%s\n\n ",gazebo_model_xml_string.c_str());
 
-  // publish to factory topic
-  gazebo::msgs::Factory msg;
-  gazebo::msgs::Init(msg, "spawn_model");
-  msg.set_sdf( gazebo_model_xml_string );
-
   //ROS_ERROR("attempting to spawn model name [%s] [%s]", model_name.c_str(),gazebo_model_xml_string.c_str());
 
   // FIXME: should use entity_info or add lock to World::receiveMutex
   // looking for Model to see if it exists already
-  gazebo::msgs::Request *entity_info_msg = gazebo::msgs::CreateRequest("entity_info", model_name);
-  request_pub_->Publish(*entity_info_msg,true);
+  this->publishRequest("entity_info", model_name);
   // todo: should wait for response response_sub_, check to see that if _msg->response == "nonexistant"
 
   gazebo::physics::ModelPtr model = world_->GetModel(model_name);
@@ -2858,8 +2854,29 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
     return true;
   }
 
-  // Publish the factory message
-  factory_pub_->Publish(msg);
+#if GAZEBO_MAJOR_VERSION > 6
+  // for Gazebo 7 and up, use a different method to spawn lights
+  if (isLight)
+  {
+    // Publish the light message to spawn the light (Gazebo 7 and up)
+    sdf::SDF sdf_light;
+    sdf_light.SetFromString(gazebo_model_xml_string);
+    gazebo::msgs::Light msg = gazebo::msgs::LightFromSDF(sdf_light.Root()->GetElement("light"));
+    factory_light_pub_->Publish(msg);
+  }
+  else
+#else
+  // for Gazebo 6 and lower, use the standard factory to spawn all object
+  if (true)
+#endif
+  {
+    // Publish a factory message to spawn the model
+    gazebo::msgs::Factory msg;
+    gazebo::msgs::Init(msg, "spawn_model");
+    msg.set_sdf( gazebo_model_xml_string );
+    factory_pub_->Publish(msg);
+  }
+
   /// FIXME: should change publish to direct invocation World::LoadModel() and/or
   ///        change the poll for Model existence to common::Events based check.
 
@@ -2921,8 +2938,7 @@ bool GazeboRosApiPlugin::requestSceneUpdate()
 {
   // request updated scene
   scene_update_done_ = false;
-  gazebo::msgs::Request *scene_info_msg = gazebo::msgs::CreateRequest("scene_info", "");
-  request_pub_->Publish(*scene_info_msg, true);
+  this->publishRequest("scene_info", "");
 
   // wait until updated scene arrived
   ros::Duration scene_update_timeout(10.0);
@@ -2952,6 +2968,7 @@ bool GazeboRosApiPlugin::getVisualFromScene(ModelIter &model, LinkIter &link, Vi
                                             const std::string &model_name, const std::string &link_name,
                                             const std::string &visual_name)
 {
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
   model = gazeboscene_.mutable_model()->begin();
   for (; model != gazeboscene_.mutable_model()->end(); model++)
   {
@@ -3007,6 +3024,15 @@ std::vector<std::string> GazeboRosApiPlugin::split(const std::string &input, con
     result.push_back(s);
   }
   return result;
+}
+
+// HBP helper function - use one time request publishers to avoid race conditions with scene updates
+// and other concurrent deletes, adding mutex-es in the above code with a class level publisher
+// does not resolve the issue, this plugin should be refactored in the future
+void GazeboRosApiPlugin::publishRequest(const std::string &type, const std::string &value) {
+  gazebo::transport::PublisherPtr pub = gazebonode_->Advertise<gazebo::msgs::Request>("~/request");
+  gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest(type, value);
+  pub->Publish(*msg,true);
 }
 
 // Register this plugin with the simulator

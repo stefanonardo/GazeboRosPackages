@@ -401,6 +401,9 @@ private:
   // HBP helper function
   std::vector<std::string> split(const std::string &input, const char &token);
 
+  // HBP helper function
+  void publishRequest(const std::string &type, const std::string &value);
+
   // track if the desconstructor event needs to occur
   bool plugin_loaded_;
 
@@ -413,6 +416,7 @@ private:
   gazebo::transport::NodePtr gazebonode_;
   gazebo::transport::SubscriberPtr stat_sub_;
   gazebo::transport::PublisherPtr factory_pub_;
+  gazebo::transport::PublisherPtr factory_light_pub_;
   gazebo::transport::PublisherPtr request_pub_;
   gazebo::transport::SubscriberPtr response_sub_;
 
@@ -500,6 +504,7 @@ private:
 
   /// \brief A mutex to lock access to fields that are used in ROS message callbacks
   boost::mutex lock_;
+  boost::recursive_mutex scene_lock_;
 
   bool world_created_;
 
