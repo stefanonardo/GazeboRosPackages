@@ -1,8 +1,13 @@
-string brain_type        # Type of the brain (currently "py" or "h5"
-string brain_data        # Brain data field
-string data_type         # Type of data in brain_data: text or base64
-string brain_populations # Type of the brain populations: json
+string brain_type               # Type of the brain (currently "py" or "h5"
+string brain_data               # Brain data field
+string data_type                # Type of data in brain_data: text or base64
+string brain_populations        # Type of the brain populations: json
+int32 change_population         # Force to change transfer functions
+int32 ASK_RENAME_POPULATION=0   # User has not confirmed change yet
+int32 DO_RENAME_POPULATION=1    # Premission granted, so we change TFs
+int32 NOT_CHANGE_POPULATION=2   # User disallowes us to make changes, any other value would work
 ---
-string error_message     # Error message
-int32 error_line         # Line in code where error occured
-int32 error_column       # Column in code where error occured
+string error_message            # Error message
+int32 error_line                # Line in code where error occured
+int32 error_column              # Column in code where error occured
+bool handle_population_change   # Ask the user if we change transfer functions
