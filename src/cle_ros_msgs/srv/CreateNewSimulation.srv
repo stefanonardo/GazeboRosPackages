@@ -1,5 +1,5 @@
-string environment_file           # name of the Gazebo World file to be loaded
-string generated_cle_script_file  # name of the CLE generated python script
+string environment_file           # path of the Gazebo World file to be loaded
+string exd_config_file            # path of experiment configuration file
 string gzserver_host              # host type 'local' or 'lugano'
 int32 sim_id                      # simulation ID
 ---
