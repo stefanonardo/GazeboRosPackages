@@ -44,6 +44,7 @@ add_message_files(
    FILES
    CLEError.msg
    CSVRecordedFile.msg
+   Device.msg
    ExperimentPopulationInfo.msg
    NeuronParameter.msg
    PopulationInfo.msg
@@ -53,6 +54,9 @@ add_message_files(
    SpikeData.msg
    SpikeEvent.msg
    SpikeRate.msg
+   TransferFunction.msg
+   Topic.msg
+   Variable.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -65,12 +69,14 @@ add_service_files(
    GetCSVRecordersFiles.srv
    GetPopulations.srv
    GetSimulationState.srv
+   GetStructuredTransferFunctions.srv
    GetTransferFunctions.srv
    GetVersion.srv
    Health.srv
    IsSimulationRunning.srv
    ResetSimulation.srv
    SetBrain.srv
+   SetStructuredTransferFunction.srv
    SetTransferFunction.srv
    Trigger.srv
 )
