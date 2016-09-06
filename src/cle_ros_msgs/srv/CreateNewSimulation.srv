@@ -1,6 +1,7 @@
 string environment_file           # path of the Gazebo World file to be loaded
 string exd_config_file            # path of experiment configuration file
 string gzserver_host              # host type 'local' or 'lugano'
+int32 brain_processes             # number of brain processes (overrides experiment configuration)
 int32 sim_id                      # simulation ID
 ---
 bool success                      # return true if the experiment is started properly
