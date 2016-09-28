@@ -6,6 +6,8 @@ int32 SEVERITY_ERROR=1    # The error will lead to a simulation failure if not r
 int32 SEVERITY_CRITICAL=2 # The error has lead to simulation failure
 
 string sourceType # e.g., "Transfer Function"
+string SOURCE_TYPE_TRANSFER_FUNCTION=Transfer Function
+string SOURCE_TYPE_STATE_MACHINE=State Machine
 string errorType # e.g., "NoOrMultipleNames", "Compile", "Loading", "Runtime"
 string message # description of the error, e.g., "IndentationError: unexpected indent"
 
