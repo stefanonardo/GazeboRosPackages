@@ -2,6 +2,48 @@
 Changelog for package gazebo_ros_pkgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.5.7 (2016-06-10)
+------------------
+
+2.5.6 (2016-04-28)
+------------------
+
+2.5.5 (2016-04-27)
+------------------
+* merge indigo, jade to kinetic-devel
+* Update maintainer for Kinetic release
+* Contributors: Jose Luis Rivero, Steven Peters
+
+2.5.3 (2016-04-11)
+------------------
+
+2.5.2 (2016-02-25)
+------------------
+* merging from indigo-devel
+* 2.4.9
+* Generate changelog
+* Contributors: John Hsu, Jose Luis Rivero
+
+2.5.1 (2015-08-16)
+------------------
+
+2.5.0 (2015-04-30)
+------------------
+
+2.4.10 (2016-02-25)
+-------------------
+
+2.4.9 (2015-08-16)
+------------------
+
+2.4.8 (2015-03-17)
+------------------
+
+2.4.7 (2014-12-15)
+------------------
+* Update Gazebo/ROS tutorial URL
+* Contributors: Jose Luis Rivero
+
 2.4.6 (2014-09-01)
 ------------------
 

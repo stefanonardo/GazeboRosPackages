@@ -19,10 +19,11 @@ add_message_files(
   LinkStates.msg
   ModelState.msg
   ModelStates.msg
-  JointStates.msg
   ODEJointProperties.msg
   ODEPhysics.msg
   WorldState.msg
+# NRP custom messages
+  JointStates.msg
   )
 
 add_service_files(DIRECTORY srv FILES
@@ -46,14 +47,15 @@ add_service_files(DIRECTORY srv FILES
   SetLinkState.srv
   SetPhysicsProperties.srv
   SetJointTrajectory.srv
+# NRP custom services
   AdvanceSimulation.srv
-  GetVisualProperties.srv
-  SetVisualProperties.srv
-  GetLightProperties.srv
-  SetLightProperties.srv
-  ExportWorldSDF.srv
-  GetLightsName.srv
   DeleteLight.srv
+  ExportWorldSDF.srv
+  GetLightProperties.srv
+  GetLightsName.srv
+  GetVisualProperties.srv
+  SetLightProperties.srv
+  SetVisualProperties.srv 
   )
 
 generate_messages(DEPENDENCIES
@@ -71,5 +73,4 @@ catkin_package(
   geometry_msgs
   sensor_msgs
   std_srvs
-  message_generation
   )

@@ -217,19 +217,19 @@ void HuskyPlugin::UpdateChild()
     d_fr = step_time.Double() * (wd / 2) * joints_[FR]->GetVelocity(0);
 
   // Can see NaN values here, just zero them out if needed
-  if (isnan(d_bl)) {
+  if (std::isnan(d_bl)) {
     ROS_WARN_THROTTLE(0.1, "Gazebo ROS Husky plugin. NaN in d_bl. Step time: %.2f. WD: %.2f. Velocity: %.2f", step_time.Double(), wd, joints_[BL]->GetVelocity(0));
     d_bl = 0;
   }
-  if (isnan(d_br)) {
+  if (std::isnan(d_br)) {
     ROS_WARN_THROTTLE(0.1, "Gazebo ROS Husky plugin. NaN in d_br. Step time: %.2f. WD: %.2f. Velocity: %.2f", step_time.Double(), wd, joints_[BR]->GetVelocity(0));
     d_br = 0;
   }
-  if (isnan(d_fl)) {
+  if (std::isnan(d_fl)) {
     ROS_WARN_THROTTLE(0.1, "Gazebo ROS Husky plugin. NaN in d_fl. Step time: %.2f. WD: %.2f. Velocity: %.2f", step_time.Double(), wd, joints_[FL]->GetVelocity(0));
     d_fl = 0;
   }
-  if (isnan(d_fr)) {
+  if (std::isnan(d_fr)) {
     ROS_WARN_THROTTLE(0.1, "Gazebo ROS Husky plugin. NaN in d_fr. Step time: %.2f. WD: %.2f. Velocity: %.2f", step_time.Double(), wd, joints_[FR]->GetVelocity(0));
     d_fr = 0;
   }

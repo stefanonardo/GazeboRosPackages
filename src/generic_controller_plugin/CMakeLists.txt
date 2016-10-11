@@ -70,7 +70,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES generic_controller_plugin
   CATKIN_DEPENDS gazebo_ros gazebo_msgs roscpp std_msgs
-  DEPENDS system_lib
+#  DEPENDS system_lib
 )
 
 ###########

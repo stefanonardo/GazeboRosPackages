@@ -1,28 +1,23 @@
 /*
- *  Gazebo - Outdoor Multi-Robot Simulator
- *  Copyright (C) 2003
- *     Nate Koenig & Andrew Howard
+ * Copyright (C) 2012-2014 Open Source Robotics Foundation
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
- */
-
-/* Desc: External interfaces for Gazebo
+*/
+/*
+ * Desc: External interfaces for Gazebo
  * Author: Nate Koenig, John Hsu, Dave Coleman
  * Date: 25 Apr 2010
- * SVN: $Id: main.cc 8598 2010-03-22 21:59:24Z hsujohnhsu $
  */
 
 #ifndef __GAZEBO_ROS_API_PLUGIN_HH__
@@ -77,25 +72,11 @@
 #include "gazebo_msgs/SetLinkState.h"
 #include "gazebo_msgs/GetLinkState.h"
 
-// patched for HBP
-#include "gazebo_msgs/AdvanceSimulation.h"
-
-// new for HBP
-#include "gazebo_msgs/GetVisualProperties.h"
-#include "gazebo_msgs/SetVisualProperties.h"
-#include "gazebo_msgs/GetLightProperties.h"
-#include "gazebo_msgs/SetLightProperties.h"
-#include "gazebo_msgs/ExportWorldSDF.h"
-#include "gazebo_msgs/GetLightsName.h"
-#include "gazebo_msgs/DeleteLight.h"
-
 // Topics
 #include "gazebo_msgs/ModelState.h"
 #include "gazebo_msgs/LinkState.h"
 #include "gazebo_msgs/ModelStates.h"
 #include "gazebo_msgs/LinkStates.h"
-
-#include "gazebo_msgs/JointStates.h"
 
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Wrench.h"
@@ -115,22 +96,45 @@
 
 #include <boost/algorithm/string.hpp>
 
-// HBP
+// ===================================================
+// BEGIN Custom NRP headers
+// ===================================================
+
+#include "gazebo_msgs/AdvanceSimulation.h"
+#include "gazebo_msgs/GetVisualProperties.h"
+#include "gazebo_msgs/SetVisualProperties.h"
+#include "gazebo_msgs/GetLightProperties.h"
+#include "gazebo_msgs/SetLightProperties.h"
+#include "gazebo_msgs/ExportWorldSDF.h"
+#include "gazebo_msgs/GetLightsName.h"
+#include "gazebo_msgs/DeleteLight.h"
+
+#include "gazebo_msgs/JointStates.h"
+
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <string>
-// END HBP
+
+// ===================================================
+// END Custom NRP headers
+// ===================================================
 
 namespace gazebo
 {
 
-// HBP
+// ===================================================
+// BEGIN NRP
+// ===================================================
+
 typedef google::protobuf::RepeatedPtrField<gazebo::msgs::Model>::iterator  ModelIter;
 typedef google::protobuf::RepeatedPtrField<gazebo::msgs::Link>::iterator   LinkIter;
 typedef google::protobuf::RepeatedPtrField<gazebo::msgs::Visual>::iterator VisualIter;
-
 typedef google::protobuf::RepeatedPtrField<gazebo::msgs::Light>::iterator  LightIter;
+
+// ===================================================
+// END NRP
+// ===================================================
 
 /// \brief A plugin loaded within the gzserver on startup.
 class GazeboRosApiPlugin : public SystemPlugin
@@ -141,13 +145,13 @@ public:
 
   /// \brief Destructor
   ~GazeboRosApiPlugin();
-  
+
   /// \bried Detect if sig-int shutdown signal is recieved
   void shutdownSignal();
 
   /// \brief Gazebo-inherited load function
-  /// 
-  /// Called before Gazebo is loaded. Must not block. 
+  ///
+  /// Called before Gazebo is loaded. Must not block.
   /// Capitalized per Gazebo cpp style guidelines
   /// \param _argc Number of command line arguments.
   /// \param _argv Array of command line arguments.
@@ -171,23 +175,11 @@ public:
   /// \brief
   void onModelStatesDisconnect();
 
-  /// \brief
-  void onJointStatesConnect();
-
-  /// \brief
-  void onJointStatesDisconnect();
-
   /// \brief Function for inserting a URDF into Gazebo from ROS Service Call
   bool spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
 
-  /// \brief Function for inserting a URDF into Gazebo from ROS Service Call. Deprecated in ROS Hydro - replace with spawnURDFModel()
-  ROS_DEPRECATED bool spawnGazeboModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
-
   /// \brief Both SDFs and converted URDFs get sent to this function for further manipulation from a ROS Service call
   bool spawnSDFModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
-
-  /// \brief Light SDFs gets sent to this function for further manipulation from a ROS Service call
-  bool spawnSDFLight(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
 
   /// \brief delete model given name
   bool deleteModel(gazebo_msgs::DeleteModel::Request &req,gazebo_msgs::DeleteModel::Response &res);
@@ -220,7 +212,7 @@ public:
   bool getPhysicsProperties(gazebo_msgs::GetPhysicsProperties::Request &req,gazebo_msgs::GetPhysicsProperties::Response &res);
 
   /// \brief
-  bool setJointProperties(gazebo_msgs::SetJointProperties::Request &req,gazebo_msgs::SetJointProperties::Response &res);
+  bool setJointProperties(gazebo_msgs::SetJointProperties::Request &req, gazebo_msgs::SetJointProperties::Response &res);
 
   /// \brief
   bool setModelState(gazebo_msgs::SetModelState::Request &req,gazebo_msgs::SetModelState::Response &res);
@@ -236,53 +228,6 @@ public:
 
   /// \brief
   bool resetWorld(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool advanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,gazebo_msgs::AdvanceSimulation::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool resetSimTime(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool resetSim(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool endWorld(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool deleteLights(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
-
-  /// \brief delete a given light by name
-  bool deleteLight(gazebo_msgs::DeleteLight::Request &req,gazebo_msgs::DeleteLight::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool getVisualProperties(gazebo_msgs::GetVisualProperties::Request &req, gazebo_msgs::GetVisualProperties::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool setVisualProperties(gazebo_msgs::SetVisualProperties::Request &req, gazebo_msgs::SetVisualProperties::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool getLightProperties(gazebo_msgs::GetLightProperties::Request &req, gazebo_msgs::GetLightProperties::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool getLightsName(gazebo_msgs::GetLightsName::Request &req, gazebo_msgs::GetLightsName::Response &res);
-
-  // Patched for HBP
-  /// \brief
-  bool exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req, gazebo_msgs::ExportWorldSDF::Response &res);
-
-  // patched for HBP
-  /// \brief
-  bool setLightProperties(gazebo_msgs::SetLightProperties::Request &req, gazebo_msgs::SetLightProperties::Response &res);
 
   /// \brief
   bool pausePhysics(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res);
@@ -310,8 +255,77 @@ public:
   /// \brief
   bool applyBodyWrench(gazebo_msgs::ApplyBodyWrench::Request &req,gazebo_msgs::ApplyBodyWrench::Response &res);
 
-private:
+  // ===================================================
+  // BEGIN Custom NRP public attributes & methods
+  // ===================================================
 
+  /// \brief
+  void nrpOnJointStatesConnect();
+
+  /// \brief
+  void nrpOnJointStatesDisconnect();
+
+  /// \brief advertise custom services for the NRP
+  void nrpAdvertiseServices();
+
+  /// \brief
+  bool nrpAdvanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
+                            gazebo_msgs::AdvanceSimulation::Response &res);
+
+  /// \brief
+  bool nrpResetSimTime(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+
+  /// \brief
+  bool nrpResetSim(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+
+  /// \brief
+  bool nrpEndWorld(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+
+  /// \brief
+  bool nrpDeleteLights(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+
+  /// \brief delete a given light by name
+  bool nrpDeleteLight(gazebo_msgs::DeleteLight::Request &req,
+                      gazebo_msgs::DeleteLight::Response &res);
+
+  /// \brief
+  bool nrpGetVisualProperties(gazebo_msgs::GetVisualProperties::Request &req,
+                              gazebo_msgs::GetVisualProperties::Response &res);
+
+  /// \brief
+  bool nrpSetVisualProperties(gazebo_msgs::SetVisualProperties::Request &req,
+                              gazebo_msgs::SetVisualProperties::Response &res);
+
+  /// \brief
+  bool nrpGetLightProperties(gazebo_msgs::GetLightProperties::Request &req,
+                             gazebo_msgs::GetLightProperties::Response &res);
+
+  /// \brief
+  bool nrpGetLightsName(gazebo_msgs::GetLightsName::Request &req,
+                        gazebo_msgs::GetLightsName::Response &res);
+
+  /// \brief
+  bool nrpExportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req,
+                         gazebo_msgs::ExportWorldSDF::Response &res);
+
+  /// \brief
+  bool nrpSetLightProperties(gazebo_msgs::SetLightProperties::Request &req,
+                             gazebo_msgs::SetLightProperties::Response &res);
+
+  /// \brief Light SDFs gets sent to this function for further manipulation from a ROS Service call
+  bool nrpSpawnSDFLight(gazebo_msgs::SpawnModel::Request &req,
+                        gazebo_msgs::SpawnModel::Response &res);
+
+  /// \brief
+  bool nrpUpdateInitialPoseAndModelName(TiXmlDocument &gazebo_model_xml,
+                                        gazebo_msgs::SpawnModel::Request &req,
+                                        gazebo_msgs::SpawnModel::Response &res);
+
+  // ===================================================
+  // END Custom NRP public attributes & methods
+  // ===================================================
+
+private:
   /// \brief
   void wrenchBodySchedulerSlot();
 
@@ -329,31 +343,24 @@ private:
   void publishModelStates();
 
   /// \brief
-  void publishJointStates();
-
-  /// \brief
   void stripXmlDeclaration(std::string &model_xml);
 
   /// \brief Update the model name and pose of the SDF file before sending to Gazebo
-  void updateSDFAttributes(TiXmlDocument &gazebo_model_xml, std::string model_name, 
+  void updateSDFAttributes(TiXmlDocument &gazebo_model_xml, std::string model_name,
                            gazebo::math::Vector3 initial_xyz, gazebo::math::Quaternion initial_q);
 
   /// \brief Update the model pose of the URDF file before sending to Gazebo
-  void updateURDFModelPose(TiXmlDocument &gazebo_model_xml, 
+  void updateURDFModelPose(TiXmlDocument &gazebo_model_xml,
                            gazebo::math::Vector3 initial_xyz, gazebo::math::Quaternion initial_q);
 
   /// \brief Update the model name of the URDF file before sending to Gazebo
   void updateURDFName(TiXmlDocument &gazebo_model_xml, std::string model_name);
 
-  /// \brief Update the inital pause and replace model name
-  bool updateInitialPoseAndModelName(TiXmlDocument &gazebo_model_xml, gazebo_msgs::SpawnModel::Request &req,
-                                       gazebo_msgs::SpawnModel::Response &res);
-
   /// \brief
   void walkChildAddRobotNamespace(TiXmlNode* robot_xml);
 
   /// \brief
-  bool spawnAndConform(TiXmlDocument &gazebo_model_xml, std::string model_name, 
+  bool spawnAndConform(TiXmlDocument &gazebo_model_xml, std::string model_name,
                        gazebo_msgs::SpawnModel::Response &res, bool isLight = false);
 
   /// \brief helper function for applyBodyWrench
@@ -386,29 +393,11 @@ private:
   /// \brief convert xml to Pose
   gazebo::math::Vector3 parseVector3(const std::string &str);
 
-  // HBP helper function
-  bool requestSceneUpdate();
-
-  // HBP helper function
-  bool getVisualFromScene(ModelIter &model, LinkIter &link, VisualIter &visual,
-                          const std::string &model_name, const std::string &link_name,
-                          const std::string &visual_name);
-
-  // HBP helper function
-  bool updateVisualProperty(VisualIter &visual, const std::string prop_name,
-                            const std::string prop_value);
-
-  // HBP helper function
-  std::vector<std::string> split(const std::string &input, const char &token);
-
-  // HBP helper function
-  void publishRequest(const std::string &type, const std::string &value);
-
   // track if the desconstructor event needs to occur
   bool plugin_loaded_;
 
   // detect if sigint event occurs
-  bool stop_; 
+  bool stop_;
   gazebo::event::ConnectionPtr sigint_event_;
 
   std::string robot_namespace_;
@@ -416,15 +405,8 @@ private:
   gazebo::transport::NodePtr gazebonode_;
   gazebo::transport::SubscriberPtr stat_sub_;
   gazebo::transport::PublisherPtr factory_pub_;
-  gazebo::transport::PublisherPtr factory_light_pub_;
   gazebo::transport::PublisherPtr request_pub_;
   gazebo::transport::SubscriberPtr response_sub_;
-
-  // HBP
-  gazebo::msgs::Scene gazeboscene_;
-  bool scene_update_done_;
-
-  int export_sdf_count_; // HBP
 
   boost::shared_ptr<ros::NodeHandle> nh_;
   ros::CallbackQueue gazebo_queue_;
@@ -438,9 +420,7 @@ private:
   gazebo::event::ConnectionPtr pub_model_states_event_;
   gazebo::event::ConnectionPtr load_gazebo_ros_api_plugin_event_;
 
-  ros::ServiceServer spawn_gazebo_model_service_; // DEPRECATED IN HYDRO
   ros::ServiceServer spawn_sdf_model_service_;
-  ros::ServiceServer spawn_sdf_light_service_; // patched for HBP
   ros::ServiceServer spawn_urdf_model_service_;
   ros::ServiceServer delete_model_service_;
   ros::ServiceServer get_model_state_service_;
@@ -460,18 +440,6 @@ private:
   ros::ServiceServer set_link_state_service_;
   ros::ServiceServer reset_simulation_service_;
   ros::ServiceServer reset_world_service_;
-  ros::ServiceServer advance_simulation_service_; // patched for HBP
-  ros::ServiceServer reset_sim_time_service_; // patched for HBP
-  ros::ServiceServer reset_sim_service_; // patched for HBP
-  ros::ServiceServer end_world_service_; // patched for HBP
-  ros::ServiceServer delete_lights_service_; // patched for HBP
-  ros::ServiceServer delete_light_service_; // patched for HBP
-  ros::ServiceServer get_object_properties_service_; // patched for HBP
-  ros::ServiceServer get_lights_name_service_; // patched for HBP
-  ros::ServiceServer set_object_properties_service_; // patched for HBP
-  ros::ServiceServer get_light_properties_service_;  // patched for HBP
-  ros::ServiceServer set_light_properties_service_;  // patched for HBP
-  ros::ServiceServer export_world_sdf_service_;  // patched for HBP
   ros::ServiceServer pause_physics_service_;
   ros::ServiceServer unpause_physics_service_;
   ros::ServiceServer clear_joint_forces_service_;
@@ -480,14 +448,6 @@ private:
   ros::Subscriber    set_model_state_topic_;
   ros::Publisher     pub_link_states_;
   ros::Publisher     pub_model_states_;
-
-  // HBP
-  ros::Publisher     pub_joint_states_;
-  int                pub_joint_states_connection_count_;
-  gazebo::event::ConnectionPtr pub_joint_states_event_;
-
-  int                pub_link_states_connection_count_;
-  int                pub_model_states_connection_count_;
 
   // ROS comm
   boost::shared_ptr<ros::AsyncSpinner> async_ros_spin_;
@@ -501,6 +461,8 @@ private:
   dynamic_reconfigure::Server<gazebo_ros::PhysicsConfig>::CallbackType physics_reconfigure_callback_;
 
   ros::Publisher     pub_clock_;
+  int pub_clock_frequency_;
+  gazebo::common::Time last_pub_clock_time_;
 
   /// \brief A mutex to lock access to fields that are used in ROS message callbacks
   boost::mutex lock_;
@@ -530,6 +492,61 @@ private:
   std::vector<GazeboRosApiPlugin::WrenchBodyJob*> wrench_body_jobs_;
   std::vector<GazeboRosApiPlugin::ForceJointJob*> force_joint_jobs_;
 
+  /// \brief index counters to count the accesses on models via GetModelState
+  std::map<std::string, unsigned int> access_count_get_model_state_;
+
+  // ===================================================
+  // BEGIN Custom NRP private attributes & methods
+  // ===================================================
+
+  ros::ServiceServer nrp_spawn_sdf_light_service_;
+  ros::ServiceServer nrp_advance_simulation_service_;
+  ros::ServiceServer nrp_reset_sim_time_service_;
+  ros::ServiceServer nrp_reset_sim_service_;
+  ros::ServiceServer nrp_end_world_service_;
+  ros::ServiceServer nrp_delete_lights_service_;
+  ros::ServiceServer nrp_delete_light_service_;
+  ros::ServiceServer nrp_get_object_properties_service_;
+  ros::ServiceServer nrp_get_lights_name_service_;
+  ros::ServiceServer nrp_set_object_properties_service_;
+  ros::ServiceServer nrp_get_light_properties_service_;
+  ros::ServiceServer nrp_set_light_properties_service_;
+  ros::ServiceServer nrp_export_world_sdf_service_;
+
+  gazebo::transport::PublisherPtr nrp_factory_light_pub_;
+
+  int                pub_link_states_connection_count_;
+  int                pub_model_states_connection_count_;
+
+  gazebo::msgs::Scene nrp_gazeboscene_;
+  bool nrp_scene_update_done_;
+
+  int nrp_export_sdf_count_;
+
+  ros::Publisher     nrp_pub_joint_states_;
+  int                nrp_pub_joint_states_connection_count_;
+  gazebo::event::ConnectionPtr nrp_pub_joint_states_event_;
+
+  // helper function
+  bool nrpRequestSceneUpdate();
+
+  // helper function
+  // Do NOT use scoped names for model, link or visual.
+  bool nrpGetVisualFromWorld(const std::string &model_name, const std::string &link_name,
+                             const std::string &visual_name, gazebo::msgs::Visual &visualMsg);
+
+  // helper function
+  void nrpCleanModelMsg(gazebo::msgs::Model &modelMsg);
+
+  // helper function
+  void nrpPublishRequest(const std::string &type, const std::string &value);
+
+  /// \brief
+  void nrpPublishJointStates();
+
+  // ===================================================
+  // END Custom NRP private attributes & methods
+  // ===================================================
 };
 }
 #endif

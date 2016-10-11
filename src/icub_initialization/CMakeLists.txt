@@ -94,7 +94,7 @@ find_package(OGRE)
 catkin_package(
  LIBRARIES icub_initialization
  CATKIN_DEPENDS gazebo_ros roscpp
- DEPENDS system_lib
+# DEPENDS system_lib
 )
 
 ###########

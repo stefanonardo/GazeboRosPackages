@@ -65,7 +65,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES husky_gazebo_plugins
   CATKIN_DEPENDS gazebo_ros gazebo_msgs roscpp std_msgs
-  DEPENDS system_lib
+#  DEPENDS system_lib
 )
 
 ###########

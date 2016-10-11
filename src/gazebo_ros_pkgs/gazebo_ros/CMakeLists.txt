@@ -1,18 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gazebo_ros)
 
-# check c++11 / c++0x
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-    message(STATUS "Compiler supports cxx11")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-    message(STATUS "Compiler supports c++0x")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-endif()
-
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   roslib
@@ -36,10 +24,10 @@ endif()
 
 # Depend on system install of Gazebo
 find_package(gazebo REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 
 find_package(Boost REQUIRED COMPONENTS thread)
 
-add_definitions(-DTIXML_USE_STL)
 find_package(TinyXML REQUIRED)
 
 catkin_python_setup()
@@ -67,11 +55,15 @@ catkin_package(
     TinyXML
 )
 
-include_directories(${TBB_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS} ${GAZEBO_INCLUDE_DIRS} ${SDFormat_INCLUDE_DIRS} ${TinyXML_INCLUDE_DIRS})
+include_directories(
+  include
+  ${Boost_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+  ${GAZEBO_INCLUDE_DIRS}
+  ${SDFormat_INCLUDE_DIRS}
+  ${TinyXML_INCLUDE_DIRS})
 
-link_directories(
-  ${OGRE_LIBRARY_DIRS}
-)
+link_directories(${catkin_LIBRARY_DIRS})
 
 set(cxx_flags)
 foreach (item ${GAZEBO_CFLAGS})
@@ -83,15 +75,17 @@ foreach (item ${GAZEBO_LDFLAGS})
   set(ld_flags "${ld_flags} ${item}")
 endforeach ()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
+
 ## Plugins
 add_library(gazebo_ros_api_plugin src/gazebo_ros_api_plugin.cpp)
-add_dependencies(gazebo_ros_api_plugin gazebo_msgs_gencpp ${PROJECT_NAME}_gencfg) # wait for gazebo_msgs to be built
+add_dependencies(gazebo_ros_api_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 set_target_properties(gazebo_ros_api_plugin PROPERTIES LINK_FLAGS "${ld_flags}")
 set_target_properties(gazebo_ros_api_plugin PROPERTIES COMPILE_FLAGS "${cxx_flags}")
 target_link_libraries(gazebo_ros_api_plugin ${GAZEBO_LIBRARIES} ${SDFormat_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${TinyXML_LIBRARIES})
 
 add_library(gazebo_ros_paths_plugin src/gazebo_ros_paths_plugin.cpp)
-add_dependencies(gazebo_ros_paths_plugin gazebo_msgs_gencpp ${PROJECT_NAME}_gencfg) # wait for gazebo_msgs to be built
+add_dependencies(gazebo_ros_paths_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 set_target_properties(gazebo_ros_paths_plugin PROPERTIES COMPILE_FLAGS "${cxx_flags}")
 set_target_properties(gazebo_ros_paths_plugin PROPERTIES LINK_FLAGS "${ld_flags}")
 target_link_libraries(gazebo_ros_paths_plugin ${GAZEBO_LIBRARIES} ${SDFormat_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})
