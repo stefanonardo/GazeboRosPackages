@@ -624,7 +624,7 @@ bool GazeboRosApiPlugin::spawnSDFEntity(gazebo_msgs::SpawnEntity::Request &req,
   std::string entity_xml = req.entity_xml;
 
   // store resulting Gazebo Model XML to be sent to spawn queue
-  // get incoming string containg either an URDF or a Gazebo Model XML
+  // get incoming string containing either an URDF or a Gazebo Model XML
   // grab from parameter server if necessary convert to SDF if necessary
   stripXmlDeclaration(entity_xml);
 
@@ -787,6 +787,9 @@ bool GazeboRosApiPlugin::getModelState(gazebo_msgs::GetModelState::Request &req,
     gazebo::math::Vector3    model_pos = model_pose.pos;
     gazebo::math::Quaternion model_rot = model_pose.rot;
 
+    //get model scale
+    gazebo::math::Vector3    model_scale = model->Scale();
+
     // get model twist
     gazebo::math::Vector3 model_linear_vel  = model->GetWorldLinearVel();
     gazebo::math::Vector3 model_angular_vel = model->GetWorldAngularVel();
@@ -826,6 +829,10 @@ bool GazeboRosApiPlugin::getModelState(gazebo_msgs::GetModelState::Request &req,
     res.pose.orientation.x = model_rot.x;
     res.pose.orientation.y = model_rot.y;
     res.pose.orientation.z = model_rot.z;
+
+    res.scale.x = model_scale.x;
+    res.scale.y = model_scale.y;
+    res.scale.z = model_scale.z;
 
     res.twist.linear.x = model_linear_vel.x;
     res.twist.linear.y = model_linear_vel.y;
@@ -1268,11 +1275,14 @@ bool GazeboRosApiPlugin::setModelState(gazebo_msgs::SetModelState::Request &req,
                                        gazebo_msgs::SetModelState::Response &res)
 {
   gazebo::math::Vector3 target_pos(req.model_state.pose.position.x,req.model_state.pose.position.y,req.model_state.pose.position.z);
+  gazebo::math::Vector3 target_scale(req.model_state.scale.x,req.model_state.scale.y,req.model_state.scale.z);
   gazebo::math::Quaternion target_rot(req.model_state.pose.orientation.w,req.model_state.pose.orientation.x,req.model_state.pose.orientation.y,req.model_state.pose.orientation.z);
   target_rot.Normalize(); // eliminates invalid rotation (0, 0, 0, 0)
   gazebo::math::Pose target_pose(target_pos,target_rot);
   gazebo::math::Vector3 target_pos_dot(req.model_state.twist.linear.x,req.model_state.twist.linear.y,req.model_state.twist.linear.z);
   gazebo::math::Vector3 target_rot_dot(req.model_state.twist.angular.x,req.model_state.twist.angular.y,req.model_state.twist.angular.z);
+
+  boost::recursive_mutex::scoped_lock lock(scene_lock_);
 
   gazebo::physics::ModelPtr model = world_->GetModel(req.model_state.model_name);
   if (!model)
@@ -1318,7 +1328,8 @@ bool GazeboRosApiPlugin::setModelState(gazebo_msgs::SetModelState::Request &req,
     //ROS_ERROR("target state: %f %f %f",target_pose.pos.x,target_pose.pos.y,target_pose.pos.z);
     bool is_paused = world_->IsPaused();
     world_->SetPaused(true);
-    model->SetWorldPose(target_pose);
+    model->SetWorldPose(target_pose, true, true);//tell gzserver to publish the new pose on ~/pose/info
+    model->SetScale(target_scale.Ign(), true);//and the scale on ~/model/info
     world_->SetPaused(is_paused);
     //gazebo::math::Pose p3d = model->GetWorldPose();
     //ROS_ERROR("model updated state: %f %f %f",p3d.pos.x,p3d.pos.y,p3d.pos.z);
@@ -1877,6 +1888,14 @@ void GazeboRosApiPlugin::publishModelStates()
     pose.orientation.y = rot.y;
     pose.orientation.z = rot.z;
     model_states.pose.push_back(pose);
+
+    geometry_msgs::Vector3 scaleMsg;
+    ignition::math::Vector3d scale = model->Scale();
+    scaleMsg.x = scale.X();
+    scaleMsg.y = scale.Y();
+    scaleMsg.z = scale.Z();
+    model_states.scale.push_back(scaleMsg);
+
     gazebo::math::Vector3 linear_vel  = model->GetWorldLinearVel();
     gazebo::math::Vector3 angular_vel = model->GetWorldAngularVel();
     geometry_msgs::Twist twist;
@@ -2670,7 +2689,7 @@ bool GazeboRosApiPlugin::nrpExportWorldSDF(gazebo_msgs::ExportWorldSDF::Request 
   res.sdf_dump = "";
   if (this->world_ == NULL) return false;
 
-  boost::shared_ptr<msgs::Response> response = gazebo::transport::request(world_->GetName(), "world_sdf");
+  boost::shared_ptr<msgs::Response> response = gazebo::transport::request(world_->GetName(), "world_sdf_save");
 
   msgs::GzString msg;
   std::string msgData;

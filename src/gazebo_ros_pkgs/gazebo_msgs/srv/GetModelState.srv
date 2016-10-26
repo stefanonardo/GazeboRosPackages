@@ -10,5 +10,6 @@ Header header                        # Standard metadata for higher-level stampe
                                      # * header.frame_id not used but currently filled with the relative_entity_name
 geometry_msgs/Pose pose              # pose of model in relative entity frame
 geometry_msgs/Twist twist            # twist of model in relative entity frame
+geometry_msgs/Vector3 scale          # scale of the model
 bool success                         # return true if get successful
 string status_message                # comments if available
