@@ -1,0 +1,63 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="user_avatar_basic">
+    <pose>0 0 0 0 0 0</pose>
+    <static>0</static>
+
+    <link name='body'>
+      <gravity>0</gravity>
+      <collision name='head_collision'>
+        <pose>0 0 1.6 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.2</radius>
+          </sphere>
+        </geometry>
+      </collision>
+      <collision name='body_collision'>
+        <pose>0 0 1.3 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.2</radius>
+            <length>0.6</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='head_visual'>
+        <pose>0 0 1.6 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.15</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse>
+        </material>
+      </visual>
+      <visual name='body_visual'>
+        <pose>0 0 1.125 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.15</radius>
+            <length>0.65</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <plugin name='user_controller' filename='libuser_controller_plugin.so'>
+      <controller type='link_velocity'>
+        <link_name>body</link_name>
+      </controller>
+      <controller type='model_rotation'>
+      </controller>
+      <controller type='model_position_on_ground'>
+        <step_height>0.5</step_height>
+      </controller>
+    </plugin>
+
+  </model>
+</sdf>
