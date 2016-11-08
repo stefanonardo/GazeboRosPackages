@@ -1,15 +1,17 @@
 # gazebo_ros_pkgs
 
-Wrappers, tools and additional API's for using ROS with the Gazebo simulator, patched for HBP. This packages replaces the one found in the official repositories.
+[![Build Status](http://build.ros.org/buildStatus/icon?job=Kpr__gazebo_ros_pkgs__ubuntu_xenial_amd64)](http://build.ros.org/job/Kpr__gazebo_ros_pkgs__ubuntu_xenial_amd64)
+
+Wrappers, tools and additional API's for using ROS with the Gazebo simulator. Formally simulator_gazebo stack, gazebo_pkgs is a meta package. Now Catkinized and works with the standalone Gazebo debian.
 
 ### Installation
-Copy this folder inside the src folder of a catkin workspace and then build with catkin_make
+[Installing gazebo_ros_pkgs](http://gazebosim.org/tutorials?tut=ros_installing&cat=connect_ros)
 
-### Usage
-source CATKIN_WS/devel/setup.bash
-rosrun gazebo_ros gazebo
+### Documentation and Tutorials
+[On gazebosim.org](http://gazebosim.org/tutorials?cat=connect_ros)
 
-### tinyXML problem
-if you have problems with the tinyXML compiling the gazebo_ros_pkgs, clone the missing package (tinyXML) into my catkin_workspace/src folder like
+### Develop and Contribute
 
-git clone https://github.com/ros/cmake_modules.git
+See [Contribute](https://github.com/ros-simulation/gazebo_ros_pkgs/blob/hydro-devel/CONTRIBUTING.md) page.
+
+

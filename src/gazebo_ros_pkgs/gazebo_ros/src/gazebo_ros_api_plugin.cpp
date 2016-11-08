@@ -22,7 +22,7 @@
 
 #include <gazebo/common/Events.hh>
 #include <gazebo/gazebo_config.h>
-#include "gazebo_ros_api_plugin.h"
+#include <gazebo_ros/gazebo_ros_api_plugin.h>
 
 namespace gazebo
 {
@@ -32,7 +32,9 @@ GazeboRosApiPlugin::GazeboRosApiPlugin() :
   world_created_(false),
   stop_(false),
   plugin_loaded_(false),
-  export_sdf_count_(0)
+  pub_link_states_connection_count_(0),
+  pub_model_states_connection_count_(0),
+  pub_clock_frequency_(0)
 {
   robot_namespace_.clear();
 }
@@ -53,6 +55,7 @@ GazeboRosApiPlugin::~GazeboRosApiPlugin()
   }
 
   // Disconnect slots
+  gazebo::event::Events::DisconnectWorldCreated(load_gazebo_ros_api_plugin_event_);
   gazebo::event::Events::DisconnectWorldUpdateBegin(wrench_update_event_);
   gazebo::event::Events::DisconnectWorldUpdateBegin(force_update_event_);
   gazebo::event::Events::DisconnectWorldUpdateBegin(time_update_event_);
@@ -83,11 +86,17 @@ GazeboRosApiPlugin::~GazeboRosApiPlugin()
   // Delete Force and Wrench Jobs
   lock_.lock();
   for (std::vector<GazeboRosApiPlugin::ForceJointJob*>::iterator iter=force_joint_jobs_.begin();iter!=force_joint_jobs_.end();)
+  {
     delete (*iter);
+    iter = force_joint_jobs_.erase(iter);
+  }
   force_joint_jobs_.clear();
   ROS_DEBUG_STREAM_NAMED("api_plugin","ForceJointJobs deleted");
   for (std::vector<GazeboRosApiPlugin::WrenchBodyJob*>::iterator iter=wrench_body_jobs_.begin();iter!=wrench_body_jobs_.end();)
+  {
     delete (*iter);
+    iter = wrench_body_jobs_.erase(iter);
+  }
   wrench_body_jobs_.clear();
   lock_.unlock();
   ROS_DEBUG_STREAM_NAMED("api_plugin","WrenchBodyJobs deleted");
@@ -150,7 +159,6 @@ void GazeboRosApiPlugin::Load(int argc, char** argv)
 void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
 {
   // make sure things are only called once
-  gazebo::event::Events::DisconnectWorldCreated(load_gazebo_ros_api_plugin_event_);
   lock_.lock();
   if (world_created_)
   {
@@ -175,13 +183,13 @@ void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
   gazebonode_->Init(world_name);
   //stat_sub_ = gazebonode_->Subscribe("~/world_stats", &GazeboRosApiPlugin::publishSimTime, this); // TODO: does not work in server plugin?
   factory_pub_ = gazebonode_->Advertise<gazebo::msgs::Factory>("~/factory");
-  factory_light_pub_ = gazebonode_->Advertise<gazebo::msgs::Light>("~/factory/light");
+  nrp_factory_light_pub_ = gazebonode_->Advertise<gazebo::msgs::Light>("~/factory/light");
+  // request_pub_ = gazebonode_->Advertise<gazebo::msgs::Request>("~/request");
   response_sub_ = gazebonode_->Subscribe("~/response",&GazeboRosApiPlugin::onResponse, this);
 
   // reset topic connection counts
   pub_link_states_connection_count_ = 0;
   pub_model_states_connection_count_ = 0;
-  pub_joint_states_connection_count_ = 0;
 
   /// \brief advertise all services
   advertiseServices();
@@ -194,15 +202,7 @@ void GazeboRosApiPlugin::loadGazeboRosApiPlugin(std::string world_name)
 
 void GazeboRosApiPlugin::onResponse(ConstResponsePtr &response)
 {
-  boost::recursive_mutex::scoped_lock lock(scene_lock_);
-  if (response->type() == gazeboscene_.GetTypeName())
-  {
-    gazeboscene_.Clear();
-    gazeboscene_.ParseFromString(response->serialized_data());
-    scene_update_done_ = true;
 
-    ROS_DEBUG("scene name = %s, model count = %d", gazeboscene_.name().c_str(), gazeboscene_.model_size());
-  }
 }
 
 void GazeboRosApiPlugin::gazeboQueueThread()
@@ -219,15 +219,6 @@ void GazeboRosApiPlugin::advertiseServices()
   // publish clock for simulated ros time
   pub_clock_ = nh_->advertise<rosgraph_msgs::Clock>("/clock",10);
 
-  // Advertise spawn services on the custom queue - DEPRECATED IN HYDRO
-  std::string spawn_gazebo_model_service_name("spawn_gazebo_model");
-  ros::AdvertiseServiceOptions spawn_gazebo_model_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::SpawnModel>(
-                                                                  spawn_gazebo_model_service_name,
-                                                                  boost::bind(&GazeboRosApiPlugin::spawnGazeboModel,this,_1,_2),
-                                                                  ros::VoidPtr(), &gazebo_queue_);
-  spawn_gazebo_model_service_ = nh_->advertiseService(spawn_gazebo_model_aso);
-
   // Advertise spawn services on the custom queue
   std::string spawn_sdf_model_service_name("spawn_sdf_model");
   ros::AdvertiseServiceOptions spawn_sdf_model_aso =
@@ -236,16 +227,6 @@ void GazeboRosApiPlugin::advertiseServices()
                                                                   boost::bind(&GazeboRosApiPlugin::spawnSDFModel,this,_1,_2),
                                                                   ros::VoidPtr(), &gazebo_queue_);
   spawn_sdf_model_service_ = nh_->advertiseService(spawn_sdf_model_aso);
-
-  // patched for HBP
-  // Advertise spawn services on the custom queue
-  std::string spawn_sdf_light_service_name("spawn_sdf_light");
-  ros::AdvertiseServiceOptions spawn_sdf_light_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::SpawnModel>(
-                                                                  spawn_sdf_light_service_name,
-                                                                  boost::bind(&GazeboRosApiPlugin::spawnSDFLight,this,_1,_2),
-                                                                  ros::VoidPtr(), &gazebo_queue_);
-  spawn_sdf_light_service_ = nh_->advertiseService(spawn_sdf_light_aso);
 
   // Advertise spawn services on the custom queue
   std::string spawn_urdf_model_service_name("spawn_urdf_model");
@@ -350,10 +331,10 @@ void GazeboRosApiPlugin::advertiseServices()
   ros::AdvertiseOptions pub_joint_states_ao =
     ros::AdvertiseOptions::create<gazebo_msgs::JointStates>(
                                                            "joint_states",10,
-                                                           boost::bind(&GazeboRosApiPlugin::onJointStatesConnect,this),
-                                                           boost::bind(&GazeboRosApiPlugin::onJointStatesDisconnect,this),
+                                                           boost::bind(&GazeboRosApiPlugin::nrpOnJointStatesConnect,this),
+                                                           boost::bind(&GazeboRosApiPlugin::nrpOnJointStatesDisconnect,this),
                                                            ros::VoidPtr(), &gazebo_queue_);
-  pub_joint_states_ = nh_->advertise(pub_joint_states_ao);
+  nrp_pub_joint_states_ = nh_->advertise(pub_joint_states_ao);
 
   // Advertise more services on the custom queue
   std::string set_link_properties_service_name("set_link_properties");
@@ -425,124 +406,6 @@ void GazeboRosApiPlugin::advertiseServices()
                                                            boost::bind( &GazeboRosApiPlugin::updateModelState,this,_1),
                                                            ros::VoidPtr(), &gazebo_queue_);
   set_model_state_topic_ = nh_->subscribe(model_state_so);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string advance_simulation_service_name("advance_simulation");
-  ros::AdvertiseServiceOptions advance_simulation_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::AdvanceSimulation>(
-                                                               advance_simulation_service_name,
-                                                               boost::bind(&GazeboRosApiPlugin::advanceSimulation,this,_1,_2),
-                                                               ros::VoidPtr(), &gazebo_queue_);
-  advance_simulation_service_ = nh_->advertiseService(advance_simulation_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string reset_sim_time_service_name("reset_sim_time");
-  ros::AdvertiseServiceOptions reset_sim_time_aso =
-    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
-                                                          reset_sim_time_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::resetSimTime,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  reset_sim_time_service_ = nh_->advertiseService(reset_sim_time_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string reset_sim_service_name("reset_sim");
-  ros::AdvertiseServiceOptions reset_sim_aso =
-    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
-                                                          reset_sim_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::resetSim,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  reset_sim_service_ = nh_->advertiseService(reset_sim_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string end_world_service_name("end_world");
-  ros::AdvertiseServiceOptions end_world_aso =
-    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
-                                                          end_world_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::endWorld,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  end_world_service_ = nh_->advertiseService(end_world_aso);
-
-  // patched for HBP 
-  std::string delete_lights_service_name("delete_lights");
-  ros::AdvertiseServiceOptions delete_lights_aso =
-    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
-                                                          delete_lights_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::deleteLights,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  delete_lights_service_ = nh_->advertiseService(delete_lights_aso);
-
-  // patched for HBP
-  std::string delete_light_service_name("delete_light");
-  ros::AdvertiseServiceOptions delete_light_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::DeleteLight>(
-                                                          delete_light_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::deleteLight,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  delete_light_service_ = nh_->advertiseService(delete_light_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string get_object_properties_service_name("get_visual_properties");
-  ros::AdvertiseServiceOptions get_object_properties_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetVisualProperties>(
-                                                          get_object_properties_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::getVisualProperties,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  get_object_properties_service_ = nh_->advertiseService(get_object_properties_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string set_object_properties_service_name("set_visual_properties");
-  ros::AdvertiseServiceOptions set_object_properties_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::SetVisualProperties>(
-                                                          set_object_properties_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::setVisualProperties,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  set_object_properties_service_ = nh_->advertiseService(set_object_properties_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string get_light_properties_service_name("get_light_properties");
-  ros::AdvertiseServiceOptions get_light_properties_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetLightProperties>(
-                                                          get_light_properties_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::getLightProperties,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  get_light_properties_service_ = nh_->advertiseService(get_light_properties_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string get_lights_name_service_name("get_lights_name");
-  ros::AdvertiseServiceOptions get_lights_name_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetLightsName>(
-                                                          get_lights_name_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::getLightsName,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  get_lights_name_service_ = nh_->advertiseService(get_lights_name_aso);
-
-  // patched for HBP
-  // Advertise more services on the custom queue
-  std::string set_light_properties_service_name("set_light_properties");
-  ros::AdvertiseServiceOptions set_light_properties_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::SetLightProperties>(
-                                                          set_light_properties_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::setLightProperties,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  set_light_properties_service_ = nh_->advertiseService(set_light_properties_aso);
-
-  // patched for HBP
-  // Allows SDF export via ROS
-  std::string export_world_sdf_service_name("export_world_sdf");
-  ros::AdvertiseServiceOptions export_world_sdf_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::ExportWorldSDF>(
-                                                          export_world_sdf_service_name,
-                                                          boost::bind(&GazeboRosApiPlugin::exportWorldSDF,this,_1,_2),
-                                                          ros::VoidPtr(), &gazebo_queue_);
-  export_world_sdf_service_ = nh_->advertiseService(export_world_sdf_aso);
 
   // Advertise more services on the custom queue
   std::string pause_physics_service_name("pause_physics");
@@ -616,12 +479,14 @@ void GazeboRosApiPlugin::advertiseServices()
                                                           ros::VoidPtr(), &gazebo_queue_);
   reset_world_service_ = nh_->advertiseService(reset_world_aso);
 
+  nrpAdvertiseServices();
 
   // set param for use_sim_time if not set by user already
   nh_->setParam("/use_sim_time", true);
 
   // todo: contemplate setting environment variable ROBOT=sim here???
-
+  nh_->getParam("pub_clock_frequency", pub_clock_frequency_);
+  last_pub_clock_time_ = world_->GetSimTime();
 }
 
 void GazeboRosApiPlugin::onLinkStatesConnect()
@@ -636,13 +501,6 @@ void GazeboRosApiPlugin::onModelStatesConnect()
   pub_model_states_connection_count_++;
   if (pub_model_states_connection_count_ == 1) // connect on first subscriber
     pub_model_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::publishModelStates,this));
-}
-
-void GazeboRosApiPlugin::onJointStatesConnect()
-{
-  pub_joint_states_connection_count_++;
-  if (pub_joint_states_connection_count_ == 1) // connect on first subscriber
-    pub_joint_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::publishJointStates,this));
 }
 
 void GazeboRosApiPlugin::onLinkStatesDisconnect()
@@ -667,26 +525,11 @@ void GazeboRosApiPlugin::onModelStatesDisconnect()
   }
 }
 
-void GazeboRosApiPlugin::onJointStatesDisconnect()
-{
-  pub_joint_states_connection_count_--;
-  if (pub_joint_states_connection_count_ <= 0) // disconnect with no subscribers
-  {
-    gazebo::event::Events::DisconnectWorldUpdateBegin(pub_joint_states_event_);
-    if (pub_joint_states_connection_count_ < 0) // should not be possible
-      ROS_ERROR("one too mandy disconnect from pub_joint_states_ in gazebo_ros.cpp? something weird");
-  }
-}
-
 bool GazeboRosApiPlugin::spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,
                                         gazebo_msgs::SpawnModel::Response &res)
 {
-
   // get name space for the corresponding model plugins
   robot_namespace_ = req.robot_namespace;
-
-  // incoming robot name
-  std::string model_name = req.model_name;
 
   // incoming robot model string
   std::string model_xml = req.model_xml;
@@ -738,7 +581,7 @@ bool GazeboRosApiPlugin::spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,
       ROS_DEBUG_ONCE("Package name [%s] has path [%s]", package_name.c_str(), package_path.c_str());
 
       model_xml.replace(pos1,(pos2-pos1),package_path);
-      pos1 = model_xml.find(package_prefix,0);
+      pos1 = model_xml.find(package_prefix, pos1);
     }
   }
   // ROS_DEBUG("Model XML\n\n%s\n\n ",model_xml.c_str());
@@ -749,46 +592,9 @@ bool GazeboRosApiPlugin::spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,
   return spawnSDFModel(req,res);
 }
 
-// DEPRECATED IN HYDRO
-bool GazeboRosApiPlugin::spawnGazeboModel(gazebo_msgs::SpawnModel::Request &req,
-                                          gazebo_msgs::SpawnModel::Response &res)
-{
-  ROS_WARN_STREAM_NAMED("api_plugin","/gazebo/spawn_gazebo_model is deprecated, use /gazebo/spawn_sdf_model instead");
-  spawnSDFModel(req, res);
-}
-
 bool GazeboRosApiPlugin::spawnSDFModel(gazebo_msgs::SpawnModel::Request &req,
                                        gazebo_msgs::SpawnModel::Response &res)
 {
-  TiXmlDocument gazebo_model_xml;
-  if (updateInitialPoseAndModelName(gazebo_model_xml, req, res)) {
-    return true;
-  }
-
-  // do spawning check if spawn worked, return response
-  const std::string model_name(req.model_name);
-  return spawnAndConform(gazebo_model_xml, model_name, res);
-}
-
-
-bool GazeboRosApiPlugin::spawnSDFLight(gazebo_msgs::SpawnModel::Request &req,
-                                       gazebo_msgs::SpawnModel::Response &res)
-{
-  TiXmlDocument gazebo_light_xml;
-  if (updateInitialPoseAndModelName(gazebo_light_xml, req, res)) {
-    return true;
-  }
-  // do spawning check if spawn worked, return response
-  const std::string light_name(req.model_name);
-  return spawnAndConform(gazebo_light_xml, light_name, res, true); // true indicates we are passing the SDF description of a light
-}
-
-
-bool GazeboRosApiPlugin::updateInitialPoseAndModelName(TiXmlDocument &gazebo_model_xml, gazebo_msgs::SpawnModel::Request &req,
-                                       gazebo_msgs::SpawnModel::Response &res) 
-  
-{
-
   // incoming robot name
   std::string model_name = req.model_name;
 
@@ -800,7 +606,7 @@ bool GazeboRosApiPlugin::updateInitialPoseAndModelName(TiXmlDocument &gazebo_mod
   // get initial roll pitch yaw (fixed frame transform)
   gazebo::math::Quaternion initial_q(req.initial_pose.orientation.w,req.initial_pose.orientation.x,req.initial_pose.orientation.y,req.initial_pose.orientation.z);
 
-  // reference frame for initial pose definition, modify initial pose if defined
+  // refernce frame for initial pose definition, modify initial pose if defined
   gazebo::physics::LinkPtr frame = boost::dynamic_pointer_cast<gazebo::physics::Link>(world_->GetEntity(req.reference_frame));
   if (frame)
   {
@@ -832,6 +638,7 @@ bool GazeboRosApiPlugin::updateInitialPoseAndModelName(TiXmlDocument &gazebo_mod
   stripXmlDeclaration(model_xml);
 
   // put string in TiXmlDocument for manipulation
+  TiXmlDocument gazebo_model_xml;
   gazebo_model_xml.Parse(model_xml.c_str());
 
   // optional model manipulations: update initial pose && replace model name
@@ -885,9 +692,9 @@ bool GazeboRosApiPlugin::updateInitialPoseAndModelName(TiXmlDocument &gazebo_mod
     res.status_message = std::string("GazeboRosApiPlugin SpawnModel Failure: input model_xml not SDF or URDF, or cannot be converted to Gazebo compatible format.");
     return true;
   }
-   
-  // No error occured, we return false
-  return false;
+
+  // do spawning check if spawn worked, return response
+  return spawnAndConform(gazebo_model_xml, model_name, res);
 }
 
 bool GazeboRosApiPlugin::deleteModel(gazebo_msgs::DeleteModel::Request &req,
@@ -923,7 +730,7 @@ bool GazeboRosApiPlugin::deleteModel(gazebo_msgs::DeleteModel::Request &req,
   }
 
   // send delete model request
-  this->publishRequest("entity_delete", req.model_name);
+  this->nrpPublishRequest("entity_delete", req.model_name);
 
   ros::Duration model_spawn_timeout(60.0);
   ros::Time timeout = ros::Time::now() + model_spawn_timeout;
@@ -964,6 +771,26 @@ bool GazeboRosApiPlugin::getModelState(gazebo_msgs::GetModelState::Request &req,
   }
   else
   {
+     /**
+     * @brief creates a header for the result
+     * @author Markus Bader markus.bader@tuwien.ac.at
+     * @date 21th Nov 2014
+     **/
+    {
+      std::map<std::string, unsigned int>::iterator it = access_count_get_model_state_.find(req.model_name);
+      if(it == access_count_get_model_state_.end())
+      {
+        access_count_get_model_state_.insert( std::pair<std::string, unsigned int>(req.model_name, 1) );
+        res.header.seq = 1;
+      }
+      else
+      {
+        it->second++;
+        res.header.seq = it->second;
+      }
+      res.header.stamp = ros::Time::now();
+      res.header.frame_id = req.relative_entity_name; /// @brief this is a redundant information
+    }
     // get model pose
     gazebo::math::Pose       model_pose = model->GetWorldPose();
     gazebo::math::Vector3    model_pos = model_pose.pos;
@@ -1128,23 +955,6 @@ bool GazeboRosApiPlugin::getJointProperties(gazebo_msgs::GetJointProperties::Req
 
     res.rate.clear(); // use GetVelocity(i)
     res.rate.push_back(joint->GetVelocity(0));
-    
-    res.axes.clear();
-    gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
-    gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
-    
-    geometry_msgs::Vector3 axis0;
-    axis0.x = vec_axis0.x;
-    axis0.y = vec_axis0.y;
-    axis0.z = vec_axis0.z;
-    
-    geometry_msgs::Vector3 axis1;
-    axis1.x = vec_axis1.x;
-    axis1.y = vec_axis1.y;
-    axis1.z = vec_axis1.z;
-    
-    res.axes.push_back(axis0);
-    res.axes.push_back(axis1);
 
     res.success = true;
     res.status_message = "GetJointProperties: got properties";
@@ -1492,8 +1302,13 @@ bool GazeboRosApiPlugin::setModelState(gazebo_msgs::SetModelState::Request &req,
 
       //std::cout << " debug : " << relative_entity->GetName() << " : " << frame_pose << " : " << target_pose << std::endl;
       //target_pose = frame_pose + target_pose; // seems buggy, use my own
-      target_pose.pos = frame_pos + frame_rot.RotateVector(target_pos);
+      target_pose.pos = model->GetWorldPose().pos + frame_rot.RotateVector(target_pos);
       target_pose.rot = frame_rot * target_pose.rot;
+
+      // Velocities should be commanded in the requested reference
+      // frame, so we need to translate them to the world frame
+      target_pos_dot = frame_rot.RotateVector(target_pos_dot);
+      target_rot_dot = frame_rot.RotateVector(target_rot_dot);
     }
     /// @todo: FIXME map is really wrong, need to use tf here somehow
     else if (req.model_state.reference_frame == "" || req.model_state.reference_frame == "world" || req.model_state.reference_frame == "map" || req.model_state.reference_frame == "/map" )
@@ -1575,341 +1390,6 @@ bool GazeboRosApiPlugin::resetSimulation(std_srvs::Empty::Request &req,std_srvs:
 bool GazeboRosApiPlugin::resetWorld(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
 {
   world_->ResetEntities(gazebo::physics::Base::MODEL);
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::advanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
-                                           gazebo_msgs::AdvanceSimulation::Response &res)
-{
-   
-  if (!world_->IsPaused()) {
-    res.success = false;
-    res.status_message = "AdvanceSimulation: simulation is already running";
-  } else {
-    world_->Step(req.steps);
-    res.success = true;
-    res.status_message = "AdvanceSimulation: simulation successfully advanced";
-  }
-  
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::resetSimTime(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
-{
-  world_->ResetTime();
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::resetSim(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
-{
-  world_->Reset();
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::endWorld(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
-{
-  world_->Fini();
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::deleteLights(std_srvs::Empty::Request &req,std_srvs::Empty::Response &res)
-{
-  boost::recursive_mutex::scoped_lock scene_lock(scene_lock_);
-  LightIter light = gazeboscene_.mutable_light()->begin();
-  for (; light != gazeboscene_.mutable_light()->end(); light++)
-  {
-    this->publishRequest("entity_delete", light->name());
-  }
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::deleteLight(gazebo_msgs::DeleteLight::Request &req,gazebo_msgs::DeleteLight::Response &res)
-{
-  this->publishRequest("entity_delete", req.light_name);
-
-  // \brief poll and wait, verify that the model is deleted within Hardcoded 10 seconds
-  // see deleteModel and spawnAndConform
-  ros::Duration model_spawn_timeout(10.0);
-  ros::Time timeout = ros::Time::now() + model_spawn_timeout;
-
-  while (true)
-  {
-    if (ros::Time::now() > timeout)
-    {
-      res.success = false;
-      res.status_message =
-        std::string("DeleteLight: light pushed to delete queue, but delete service timed out waiting for model to disappear from simulation");
-      return true;
-    }
-
-    //boost::recursive_mutex::scoped_lock lock(*world->GetMRMutex());
-
-    const msgs::Scene &sceneMsg = world_->GetSceneMsg();
-    const int size = sceneMsg.light_size();
-    bool found = false;
-    // Check if the light is still in the scene
-    for (unsigned int i = 0; !found && i < size; ++i)
-    {
-        if (sceneMsg.light(i).name().compare(req.light_name) == 0)
-        {
-            found = true;
-        }
-    }
-    if (!found) {
-        break; //the light isn't in the scene anymore, it has been deleted.
-    }
-
-    usleep(1000);
-   }
-
-  res.status_message = "DeleteLight: " + req.light_name + " successfully deleted" ;
-  res.success = true;
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::getVisualProperties(gazebo_msgs::GetVisualProperties::Request &req,
-                                             gazebo_msgs::GetVisualProperties::Response &res)
-{
-  // request and wait for scene update
-  if (!requestSceneUpdate())
-  {
-    res.success = false;
-    res.status_message = std::string("getVisualProperties: Scene update requested for getting actual model values, but")
-      + std::string(" timed out waiting for model to appear in simulation under the name ")
-      + req.model_name;
-    return true;
-  }
-
-  // get model pointer from scene
-  ModelIter model;
-  LinkIter link;
-  VisualIter visual;
-  if (getVisualFromScene(model, link, visual, req.model_name, req.link_name, req.visual_name))
-  {
-    res.parent_model_name = visual->parent_name();
-    res.cast_shadows = visual->cast_shadows();
-    res.transparency = visual->transparency();
-    res.laser_retro = visual->laser_retro();
-    //res.pose = visual->pose();
-    //res.geometry_type = visual->geometry().type();
-    res.material_name = visual->material().script().name();
-    res.visible = visual->visible();
-    res.is_static = visual->is_static();
-    res.success = true;
-  }
-  else
-  {
-    res.success = false;
-    res.status_message = std::string("getVisualProperties: Requested visual ") + req.visual_name + std::string(" not found!");
-    return true;
-  }
-
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::setVisualProperties(gazebo_msgs::SetVisualProperties::Request &req,
-                                             gazebo_msgs::SetVisualProperties::Response &res)
-{
-  // request and wait for scene update
-  if (!requestSceneUpdate())
-  {
-    res.success = false;
-    res.status_message = std::string("setVisualProperties: Scene update requested for getting actual model values, but")
-      + std::string(" timed out waiting for model to appear in simulation under the name ")
-      + req.model_name;
-    return true;
-  }
-
-  // get model pointer from scene
-  ModelIter model;
-  LinkIter link;
-  VisualIter visual;
-  if (getVisualFromScene(model, link, visual, req.model_name, req.link_name, req.visual_name))
-  {
-    // do some corrections and fixes
-    link->clear_collision();
-    link->set_name(req.link_name);
-    //std::string cor_link_name = split(link->name());
-    //link->set_name(cor_link_name[cor_link_name.size()-1]);
-
-    // set the requested properties
-    if (updateVisualProperty(visual, req.property_name, req.property_value))
-    {
-      // Create a publisher on the ~/model/modify topic
-      gazebo::transport::PublisherPtr model_pub = gazebonode_->Advertise<gazebo::msgs::Model>("~/model/modify");
-      model_pub->Publish(*model);
-      res.success = true;
-    }
-    else
-    {
-      res.success = false;
-      res.status_message = std::string("setVisualProperties: Could not set visual property ") + req.property_name;
-    }
-  }
-  else
-  {
-    res.success = false;
-    res.status_message = std::string("setVisualProperties: Requested visual ") + req.visual_name + std::string(" not found!");
-  }
-
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::getLightProperties(gazebo_msgs::GetLightProperties::Request &req, gazebo_msgs::GetLightProperties::Response &res)
-{
-  // request and wait for scene update
-  if (!requestSceneUpdate())
-  {
-    res.success = false;
-    res.status_message = std::string("getLightProperties: Scene update requested for getting actual light values, but")
-      + std::string(" timed out waiting for light to appear in simulation under the name ")
-      + req.light_name;
-    return true;
-  }
-
-  boost::recursive_mutex::scoped_lock lock(scene_lock_);
-  LightIter light = gazeboscene_.mutable_light()->begin();
-  for (; light != gazeboscene_.mutable_light()->end(); light++)
-  {
-    if (light->name() == req.light_name)
-    {
-      res.diffuse.r = light->diffuse().r();
-      res.diffuse.g = light->diffuse().g();
-      res.diffuse.b = light->diffuse().b();
-      res.diffuse.a = light->diffuse().a();
-
-      res.attenuation_constant = light->attenuation_constant();
-      res.attenuation_linear = light->attenuation_linear();
-      res.attenuation_quadratic = light->attenuation_quadratic();
-
-      res.success = true;
-      return true;
-    }
-  }
-
-  res.success = false;
-  res.status_message = std::string("getLightProperties: Requested light ") + req.light_name + std::string(" not found!");
-
-  return true;
-}
-
-
-// patched for HBP
-bool GazeboRosApiPlugin::getLightsName(gazebo_msgs::GetLightsName::Request &req, gazebo_msgs::GetLightsName::Response &res)
-{
-
-  // request and wait for scene update
-  if (!requestSceneUpdate())
-  {
-    res.success = false;
-    res.status_message = std::string("getLightsName: Scene update requested but timed out");
-    return true;
-  }
-
-  res.light_names.clear();
-  boost::recursive_mutex::scoped_lock lock(scene_lock_);
-  LightIter light = gazeboscene_.mutable_light()->begin();
-
-  for (; light != gazeboscene_.mutable_light()->end(); light++)
-  {
-    res.light_names.push_back(light->name());
-  }
-
-  res.success = true;
-  res.status_message = std::string("getLightsName: got Lights");
-
-  return true;
-}
-
-
-// patched for HBP
-bool GazeboRosApiPlugin::setLightProperties(gazebo_msgs::SetLightProperties::Request &req, gazebo_msgs::SetLightProperties::Response &res)
-{
-  // request and wait for scene update
-  if (!requestSceneUpdate())
-  {
-    res.success = false;
-    res.status_message = std::string("setLightProperties: Scene update requested for getting actual light values, but")
-      + std::string(" timed out waiting for light to appear in simulation under the name ")
-      + req.light_name;
-    return true;
-  }
-
-  boost::recursive_mutex::scoped_lock lock(scene_lock_);
-  LightIter light = gazeboscene_.mutable_light()->begin();
-  for (; light != gazeboscene_.mutable_light()->end(); light++)
-  {
-    if (light->name() == req.light_name)
-    {
-      light->mutable_diffuse()->set_r(req.diffuse.r);
-      light->mutable_diffuse()->set_g(req.diffuse.g);
-      light->mutable_diffuse()->set_b(req.diffuse.b);
-      light->mutable_diffuse()->set_a(req.diffuse.a);
-
-      light->set_attenuation_constant(req.attenuation_constant);
-      light->set_attenuation_linear(req.attenuation_linear);
-      light->set_attenuation_quadratic(req.attenuation_quadratic);
-
-      // Create a publisher on the ~/light/modify topic
-      gazebo::transport::PublisherPtr light_pub = gazebonode_->Advertise<gazebo::msgs::Light>("~/light/modify");
-      light_pub->Publish(*light);
-
-      res.success = true;
-      return true;
-    }
-  }
-
-  res.success = false;
-  res.status_message = std::string("setLightProperties: Requested light ") + req.light_name + std::string(" not found!");
-
-  return true;
-}
-
-// patched for HBP
-bool GazeboRosApiPlugin::exportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req, gazebo_msgs::ExportWorldSDF::Response &res) { 
-  res.sdf_dump = "";
-  if (this->world_ == NULL) return false;
-
-  boost::shared_ptr<msgs::Response> response = gazebo::transport::request(world_->GetName(), "world_sdf");
-
-  msgs::GzString msg;
-  std::string msgData;
-
-  // Make sure the response is correct
-  if (response->response() == "error" || response->type() != msg.GetTypeName()) {
-    return false;
-  }
-
-  // Parse the response message
-  msg.ParseFromString(response->serialized_data());
-  // Parse the string into sdf, so we can check whether a world exists.
-  sdf::SDF sdf_parsed;
-  sdf_parsed.SetFromString(msg.data());
-
-  // Check that sdf contains world
-#if SDF_MAJOR_VERSION > 3
-  if (!sdf_parsed.Root()->HasElement("world")) {
-#else
-  if (!sdf_parsed.root->HasElement("world")) {
-#endif
-    return false;
-  }
-
-#if SDF_MAJOR_VERSION > 3
-  res.sdf_dump = sdf_parsed.Root()->ToString("");
-#else
-  res.sdf_dump = sdf_parsed.root->ToString("");
-#endif
-
   return true;
 }
 
@@ -2277,7 +1757,7 @@ void GazeboRosApiPlugin::wrenchBodySchedulerSlot()
       iter = wrench_body_jobs_.erase(iter);
     }
     else
-      iter++;
+      ++iter;
   }
   lock_.unlock();
 }
@@ -2307,7 +1787,7 @@ void GazeboRosApiPlugin::forceJointSchedulerSlot()
       iter = force_joint_jobs_.erase(iter);
     }
     else
-      iter++;
+      ++iter;
   }
   lock_.unlock();
 }
@@ -2315,18 +1795,28 @@ void GazeboRosApiPlugin::forceJointSchedulerSlot()
 void GazeboRosApiPlugin::publishSimTime(const boost::shared_ptr<gazebo::msgs::WorldStatistics const> &msg)
 {
   ROS_ERROR("CLOCK2");
+  gazebo::common::Time sim_time = world_->GetSimTime();
+  if (pub_clock_frequency_ > 0 && (sim_time - last_pub_clock_time_).Double() < 1.0/pub_clock_frequency_)
+    return;
+
   gazebo::common::Time currentTime = gazebo::msgs::Convert( msg->sim_time() );
   rosgraph_msgs::Clock ros_time_;
   ros_time_.clock.fromSec(currentTime.Double());
   //  publish time to ros
+  last_pub_clock_time_ = sim_time;
   pub_clock_.publish(ros_time_);
 }
 void GazeboRosApiPlugin::publishSimTime()
 {
+  gazebo::common::Time sim_time = world_->GetSimTime();
+  if (pub_clock_frequency_ > 0 && (sim_time - last_pub_clock_time_).Double() < 1.0/pub_clock_frequency_)
+    return;
+
   gazebo::common::Time currentTime = world_->GetSimTime();
   rosgraph_msgs::Clock ros_time_;
   ros_time_.clock.fromSec(currentTime.Double());
   //  publish time to ros
+  last_pub_clock_time_ = sim_time;
   pub_clock_.publish(ros_time_);
 }
 
@@ -2408,72 +1898,6 @@ void GazeboRosApiPlugin::publishModelStates()
     model_states.twist.push_back(twist);
   }
   pub_model_states_.publish(model_states);
-}
-
-void GazeboRosApiPlugin::publishJointStates()
-{
-  gazebo_msgs::JointStates joint_states;
-  for (unsigned int i = 0; i < world_->GetModelCount(); i ++)
-  {
-    gazebo::physics::ModelPtr model = world_->GetModel(i);
-    gazebo::physics::Joint_V model_joints = model->GetJoints();
-
-    for (unsigned int j = 0; j < model_joints.size(); j++)
-    {
-      gazebo::physics::JointPtr joint = model_joints[j];
-      joint_states.name.push_back(model->GetName() + "::" + joint->GetName());
-      joint_states.position.push_back(joint->GetAngle(0).Radian());
-
-      joint_states.rate.push_back(joint->GetVelocity(0));
-
-      gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
-      gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
-
-      geometry_msgs::Vector3 axis0;
-      axis0.x = vec_axis0.x;
-      axis0.y = vec_axis0.y;
-      axis0.z = vec_axis0.z;
-
-      geometry_msgs::Vector3 axis1;
-      axis1.x = vec_axis1.x;
-      axis1.y = vec_axis1.y;
-      axis1.z = vec_axis1.z;
-
-      joint_states.axes.push_back(axis0);
-      joint_states.axes.push_back(axis1);
-
-      gazebo::physics::JointWrench jw = joint->GetForceTorque(0);
-
-      geometry_msgs::Vector3 body1_force;
-      body1_force.x = jw.body1Force.x;
-      body1_force.y = jw.body1Force.y;
-      body1_force.z = jw.body1Force.z;
-
-      joint_states.body1Forces.push_back(body1_force);
-
-      geometry_msgs::Vector3 body2_force;
-      body2_force.x = jw.body2Force.x;
-      body2_force.y = jw.body2Force.y;
-      body2_force.z = jw.body2Force.z;
-
-      joint_states.body2Forces.push_back(body2_force);
-
-      geometry_msgs::Vector3 body1_torque;
-      body1_torque.x = jw.body1Torque.x;
-      body1_torque.y = jw.body1Torque.y;
-      body1_torque.z = jw.body1Torque.z;
-
-      joint_states.body1Torques.push_back(body1_torque);
-
-      geometry_msgs::Vector3 body2_torque;
-      body2_torque.x = jw.body2Torque.x;
-      body2_torque.y = jw.body2Torque.y;
-      body2_torque.z = jw.body2Torque.z;
-
-      joint_states.body2Torques.push_back(body2_torque);
-    }
-  }
-  pub_joint_states_.publish(joint_states);
 }
 
 void GazeboRosApiPlugin::physicsReconfigureCallback(gazebo_ros::PhysicsConfig &config, uint32_t level)
@@ -2838,11 +2262,18 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
   std::string gazebo_model_xml_string = stream.str();
   ROS_DEBUG("Gazebo Model XML\n\n%s\n\n ",gazebo_model_xml_string.c_str());
 
+  // publish to factory topic
+  gazebo::msgs::Factory msg;
+  gazebo::msgs::Init(msg, "spawn_model");
+  msg.set_sdf( gazebo_model_xml_string );
+
   //ROS_ERROR("attempting to spawn model name [%s] [%s]", model_name.c_str(),gazebo_model_xml_string.c_str());
 
   // FIXME: should use entity_info or add lock to World::receiveMutex
   // looking for Model to see if it exists already
-  this->publishRequest("entity_info", model_name);
+  /* gazebo::msgs::Request *entity_info_msg = gazebo::msgs::CreateRequest("entity_info", model_name);
+  request_pub_->Publish(*entity_info_msg,true); */
+  this->nrpPublishRequest("entity_info", model_name);
   // todo: should wait for response response_sub_, check to see that if _msg->response == "nonexistant"
 
   gazebo::physics::ModelPtr model = world_->GetModel(model_name);
@@ -2854,29 +2285,25 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
     return true;
   }
 
-#if GAZEBO_MAJOR_VERSION > 6
-  // for Gazebo 7 and up, use a different method to spawn lights
-  if (isLight)
+  #if GAZEBO_MAJOR_VERSION > 6
+    // for Gazebo 7 and up, use a different method to spawn lights
+    if (isLight)
+    {
+      // Publish the light message to spawn the light (Gazebo 7 and up)
+      sdf::SDF sdf_light;
+      sdf_light.SetFromString(gazebo_model_xml_string);
+      gazebo::msgs::Light msg = gazebo::msgs::LightFromSDF(sdf_light.Root()->GetElement("light"));
+      nrp_factory_light_pub_->Publish(msg);
+    }
+    else
+  #else
+    // for Gazebo 6 and lower, use the standard factory to spawn all object
+    if (true)
+  #endif
   {
-    // Publish the light message to spawn the light (Gazebo 7 and up)
-    sdf::SDF sdf_light;
-    sdf_light.SetFromString(gazebo_model_xml_string);
-    gazebo::msgs::Light msg = gazebo::msgs::LightFromSDF(sdf_light.Root()->GetElement("light"));
-    factory_light_pub_->Publish(msg);
+  // Publish the factory message
+  factory_pub_->Publish(msg);
   }
-  else
-#else
-  // for Gazebo 6 and lower, use the standard factory to spawn all object
-  if (true)
-#endif
-  {
-    // Publish a factory message to spawn the model
-    gazebo::msgs::Factory msg;
-    gazebo::msgs::Init(msg, "spawn_model");
-    msg.set_sdf( gazebo_model_xml_string );
-    factory_pub_->Publish(msg);
-  }
-
   /// FIXME: should change publish to direct invocation World::LoadModel() and/or
   ///        change the poll for Model existence to common::Events based check.
 
@@ -2897,28 +2324,9 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
 
     {
       //boost::recursive_mutex::scoped_lock lock(*world->GetMRMutex());
-      if (isLight) {
-        const msgs::Scene &sceneMsg = world_->GetSceneMsg();
-        const int size = sceneMsg.light_size();
-        bool success = false;
-        // Check if the light was actually spawned
-        for (unsigned int i = 0; i < size; ++i) 
-        {
-          if (sceneMsg.light(i).name().compare(model_name) == 0) 
-          {
-            success = true;
-            break;
-          }
-        }
-        if (success) 
-        {
-          break;
-        }
-      } else {
-        // Check if the model was actually spawned
-        if (world_->GetModel(model_name))
-          break;
-      }
+      if ((isLight && world_->Light(model_name) != nullptr)
+          || (world_->GetModel(model_name) != nullptr))
+        break;
     }
 
     ROS_DEBUG_STREAM_ONCE_NAMED("api_plugin","Waiting for " << timeout - ros::Time::now()
@@ -2933,109 +2341,677 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
   return true;
 }
 
-// HBP helper function
-bool GazeboRosApiPlugin::requestSceneUpdate()
+// ===================================================
+// BEGIN Custom NRP public methods implementation
+// ===================================================
+
+void GazeboRosApiPlugin::nrpOnJointStatesConnect()
 {
-  // request updated scene
-  scene_update_done_ = false;
-  this->publishRequest("scene_info", "");
+  nrp_pub_joint_states_connection_count_++;
+  if (nrp_pub_joint_states_connection_count_ == 1) // connect on first subscriber
+    nrp_pub_joint_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::nrpPublishJointStates, this));
+}
 
-  // wait until updated scene arrived
-  ros::Duration scene_update_timeout(10.0);
-  ros::Time timeout = ros::Time::now() + scene_update_timeout;
-
-  while (ros::ok())
+void GazeboRosApiPlugin::nrpOnJointStatesDisconnect()
+{
+  nrp_pub_joint_states_connection_count_--;
+  if (nrp_pub_joint_states_connection_count_ <= 0) // disconnect with no subscribers
   {
-    if (ros::Time::now() > timeout)
-    {
-      return false;
-    }
+    gazebo::event::Events::DisconnectWorldUpdateBegin(nrp_pub_joint_states_event_);
+    if (nrp_pub_joint_states_connection_count_ < 0) // should not be possible
+      ROS_ERROR("one too mandy disconnect from nrp_pub_joint_states_ in gazebo_ros.cpp? something weird");
+  }
+}
 
-    if (scene_update_done_)
-    {
-      break;
-    }
+void GazeboRosApiPlugin::nrpAdvertiseServices() {
+  // Advertise more services on the custom queue
+  std::string spawn_sdf_light_service_name("spawn_sdf_light");
+  ros::AdvertiseServiceOptions spawn_sdf_light_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::SpawnModel>(
+                                                                  spawn_sdf_light_service_name,
+                                                                  boost::bind(&GazeboRosApiPlugin::nrpSpawnSDFLight, this, _1, _2),
+                                                                  ros::VoidPtr(), &gazebo_queue_);
+  nrp_spawn_sdf_light_service_ = nh_->advertiseService(spawn_sdf_light_aso);
 
-    ROS_DEBUG_STREAM_ONCE_NAMED("api_plugin","Waiting for " << timeout - ros::Time::now() << " for scene update ");
+  // Advertise more services on the custom queue
+  std::string advance_simulation_service_name("advance_simulation");
+  ros::AdvertiseServiceOptions advance_simulation_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::AdvanceSimulation>(
+                                                               advance_simulation_service_name,
+                                                               boost::bind(&GazeboRosApiPlugin::nrpAdvanceSimulation,this,_1,_2),
+                                                               ros::VoidPtr(), &gazebo_queue_);
+  nrp_advance_simulation_service_ = nh_->advertiseService(advance_simulation_aso);
 
-    usleep(2000);
+  // patched for HBP
+  // Advertise more services on the custom queue
+  std::string reset_sim_time_service_name("reset_sim_time");
+  ros::AdvertiseServiceOptions reset_sim_time_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          reset_sim_time_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpResetSimTime,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_reset_sim_time_service_ = nh_->advertiseService(reset_sim_time_aso);
+
+  // patched for HBP
+  // Advertise more services on the custom queue
+  std::string reset_sim_service_name("reset_sim");
+  ros::AdvertiseServiceOptions reset_sim_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          reset_sim_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpResetSim,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_reset_sim_service_ = nh_->advertiseService(reset_sim_aso);
+
+  // Advertise more services on the custom queue
+  std::string end_world_service_name("end_world");
+  ros::AdvertiseServiceOptions end_world_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          end_world_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpEndWorld,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_end_world_service_ = nh_->advertiseService(end_world_aso);
+
+  // Advertise more services on the custom queue
+  std::string delete_lights_service_name("delete_lights");
+  ros::AdvertiseServiceOptions delete_lights_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          delete_lights_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpDeleteLights,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_delete_lights_service_ = nh_->advertiseService(delete_lights_aso);
+
+  // Advertise more services on the custom queue
+  std::string delete_light_service_name("delete_light");
+  ros::AdvertiseServiceOptions delete_light_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::DeleteLight>(
+                                                          delete_light_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpDeleteLight,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_delete_light_service_ = nh_->advertiseService(delete_light_aso);
+
+  // Advertise more services on the custom queue
+  std::string get_object_properties_service_name("get_visual_properties");
+  ros::AdvertiseServiceOptions get_object_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetVisualProperties>(
+                                                          get_object_properties_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpGetVisualProperties,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_get_object_properties_service_ = nh_->advertiseService(get_object_properties_aso);
+
+  // Advertise more services on the custom queue
+  std::string set_object_properties_service_name("set_visual_properties");
+  ros::AdvertiseServiceOptions set_object_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::SetVisualProperties>(
+                                                          set_object_properties_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpSetVisualProperties,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_set_object_properties_service_ = nh_->advertiseService(set_object_properties_aso);
+
+  // Advertise more services on the custom queue
+  std::string get_light_properties_service_name("get_light_properties");
+  ros::AdvertiseServiceOptions get_light_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetLightProperties>(
+                                                          get_light_properties_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpGetLightProperties,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_get_light_properties_service_ = nh_->advertiseService(get_light_properties_aso);
+
+  // Advertise more services on the custom queue
+  std::string get_lights_name_service_name("get_lights_name");
+  ros::AdvertiseServiceOptions get_lights_name_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetLightsName>(
+                                                          get_lights_name_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpGetLightsName,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_get_lights_name_service_ = nh_->advertiseService(get_lights_name_aso);
+
+  // Advertise more services on the custom queue
+  std::string set_light_properties_service_name("set_light_properties");
+  ros::AdvertiseServiceOptions set_light_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::SetLightProperties>(
+                                                          set_light_properties_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpSetLightProperties,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_set_light_properties_service_ = nh_->advertiseService(set_light_properties_aso);
+
+  // Allows SDF export via ROS
+  std::string export_world_sdf_service_name("export_world_sdf");
+  ros::AdvertiseServiceOptions export_world_sdf_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::ExportWorldSDF>(
+                                                          export_world_sdf_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpExportWorldSDF,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_export_world_sdf_service_ = nh_->advertiseService(export_world_sdf_aso);
+
+}
+
+bool GazeboRosApiPlugin::nrpAdvanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
+                                           gazebo_msgs::AdvanceSimulation::Response &res)
+{
+
+  if (!world_->IsPaused()) {
+    res.success = false;
+    res.status_message = "AdvanceSimulation: simulation is already running";
+  } else {
+    world_->Step(req.steps);
+    res.success = true;
+    res.status_message = "AdvanceSimulation: simulation successfully advanced";
+  }
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpResetSimTime(std_srvs::Empty::Request &req,
+                                         std_srvs::Empty::Response &res)
+{
+  world_->ResetTime();
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpResetSim(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+  world_->Reset();
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpEndWorld(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
+{
+  world_->Fini();
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpDeleteLights(std_srvs::Empty::Request &req,
+                                         std_srvs::Empty::Response &res)
+{
+  for (const gazebo::msgs::Light& light : nrp_gazeboscene_.light()) {
+    this->nrpPublishRequest("entity_delete", light.name());
   }
   return true;
 }
 
-// HBP helper function
-bool GazeboRosApiPlugin::getVisualFromScene(ModelIter &model, LinkIter &link, VisualIter &visual,
-                                            const std::string &model_name, const std::string &link_name,
-                                            const std::string &visual_name)
+bool GazeboRosApiPlugin::nrpDeleteLight(gazebo_msgs::DeleteLight::Request &req,
+                                        gazebo_msgs::DeleteLight::Response &res)
 {
-  boost::recursive_mutex::scoped_lock lock(scene_lock_);
-  model = gazeboscene_.mutable_model()->begin();
-  for (; model != gazeboscene_.mutable_model()->end(); model++)
-  {
-    if (model->name() == model_name)
-    {
-      link = model->mutable_link()->begin();
-      for (; link != model->mutable_link()->end(); link++)
-      {
-        if (link->name() == (model_name + "::" + link_name))
-        {
-          visual = link->mutable_visual()->begin();
-          for (; visual != link->mutable_visual()->end(); visual++)
-          {
-            if (visual->name() == (model_name + "::" + link_name + "::" + visual_name))
-            {
-              return true;
-            }
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
+  gazebo::physics::LightPtr phy_light = world_->Light(req.light_name);
 
-// HBP helper function
-bool GazeboRosApiPlugin::updateVisualProperty(VisualIter &visual, const std::string prop_name,
-                                              const std::string prop_value)
-{
-  std::vector<std::string> prop_vector = split(prop_name, ':');
-  if (prop_vector[0] == "material")
-  {
-    if (prop_vector[1] == "script")
-    {
-      if (prop_vector[2] == "name")
-      {
-        visual->mutable_material()->mutable_script()->set_name(prop_value);
+  if (phy_light == nullptr) {
+    res.success = false;
+    res.status_message = std::string("getLightProperties: Requested light ") + req.light_name + std::string(" not found!");
+  }
+  else {
+    this->nrpPublishRequest("entity_delete", req.light_name);
+    res.success = false;
+
+    for (int i = 0; i < 100; i++) {
+      phy_light = world_->Light(req.light_name);
+      if (phy_light == nullptr) {
+        res.success = true;
+        res.status_message = std::string("DeleteLight: ") + req.light_name
+                           + std::string(" successfully deleted");
         return true;
       }
+      // Check every 100ms
+      usleep(100000);
     }
   }
+
+  res.status_message = std::string("DeleteLight: Timeout reached while removing light \"") +
+                       req.light_name + std::string("\"");
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpGetVisualProperties(gazebo_msgs::GetVisualProperties::Request &req,
+                                                gazebo_msgs::GetVisualProperties::Response &res)
+{
+  gazebo::msgs::Model modelMsg;
+  gazebo::msgs::Visual visualMsg;
+
+
+  if (!nrpGetVisualFromWorld(req.model_name, req.link_name, req.visual_name, visualMsg)) {
+    res.success = false;
+    res.status_message = std::string("getVisualProperties: Requested visual ") + req.visual_name + std::string(" not found!");
+    return true;
+  }
+
+  res.parent_model_name = visualMsg.parent_name();
+  res.cast_shadows = visualMsg.cast_shadows();
+  res.transparency = visualMsg.transparency();
+  res.laser_retro = visualMsg.laser_retro();
+  //res.pose = visualMsg.pose();
+  //res.geometry_type = visualMsg.geometry().type();
+  res.material_name = visualMsg.material().script().name();
+  res.visible = visualMsg.visible();
+  res.is_static = visualMsg.is_static();
+  res.success = true;
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpSetVisualProperties(gazebo_msgs::SetVisualProperties::Request &req,
+                                                gazebo_msgs::SetVisualProperties::Response &res)
+{
+  gazebo::msgs::Visual visualMsg;
+
+if (!nrpGetVisualFromWorld(req.model_name, req.link_name, req.visual_name, visualMsg)) {
+    res.success = false;
+    res.status_message = std::string("setVisualProperties: Requested visual ") + req.visual_name + std::string(" not found!");
+    return true;
+  }
+
+  if (req.property_name != "material:script:name") {
+    res.success = false;
+    res.status_message = std::string("nrpSetVisualProperties: Could not set visual property ") +
+                         req.property_name + std::string(". The only currently supported property is material:script:name.");
+    return true;
+  }
+
+  // set the requested properties
+  visualMsg.mutable_material()->mutable_script()->set_name(req.property_value);
+
+  gazebo::physics::ModelPtr model = world_->GetModel(req.model_name);
+  gazebo::physics::LinkPtr link = model->GetLink(req.link_name);
+
+  gazebo::msgs::Model modelMsg;
+  model->FillMsg(modelMsg);
+
+  uint32_t visual_id;
+  link->VisualId(req.visual_name, visual_id);
+
+  uint32_t link_idx;
+  auto links = modelMsg.mutable_link();
+  for (unsigned int i = 0; i < links->size(); i++) {
+    if (links->Get(i).name() == (req.model_name + std::string("::") + req.link_name)) {
+      link_idx = i;
+      break;
+    }
+  }
+
+  auto visuals = modelMsg.mutable_link(link_idx)->mutable_visual();
+  for (unsigned int i = 0; i < visuals->size(); i++) {
+    if (visuals->Get(i).id() == visual_id) {
+      *(visuals->Mutable(i)) = visualMsg;
+      break;
+    }
+  }
+
+  nrpCleanModelMsg(modelMsg);
+  std::cout << modelMsg.DebugString() << std::endl;
+  // Create a publisher on the ~/model/modify topic
+  gazebo::transport::PublisherPtr model_pub =
+    gazebonode_->Advertise<gazebo::msgs::Model>("~/model/modify");
+  model_pub->Publish(modelMsg);
+
+  res.status_message = std::string("nrpSetVisualProperties: Visual properties successfully updated.");
+  res.success = true;
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpGetLightProperties(gazebo_msgs::GetLightProperties::Request &req,
+                                               gazebo_msgs::GetLightProperties::Response &res)
+{
+  gazebo::physics::LightPtr phy_light = world_->Light(req.light_name);
+
+  if (phy_light == nullptr) {
+      res.success = false;
+      res.status_message = std::string("getLightProperties: Requested light ") + req.light_name + std::string(" not found!");
+  }
+  else {
+    gazebo::msgs::Light light;
+    phy_light->FillMsg(light);
+
+    res.diffuse.r = light.diffuse().r();
+    res.diffuse.g = light.diffuse().g();
+    res.diffuse.b = light.diffuse().b();
+    res.diffuse.a = light.diffuse().a();
+
+    res.attenuation_constant = light.attenuation_constant();
+    res.attenuation_linear = light.attenuation_linear();
+    res.attenuation_quadratic = light.attenuation_quadratic();
+
+    res.success = true;
+  }
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpGetLightsName(gazebo_msgs::GetLightsName::Request &req,
+                                          gazebo_msgs::GetLightsName::Response &res)
+{
+  gazebo::msgs::Scene scene = world_->GetSceneMsg();
+  res.light_names.clear();
+
+  for (const gazebo::msgs::Light &light : scene.light())
+  {
+    res.light_names.push_back(light.name());
+  }
+
+  res.success = true;
+  res.status_message = std::string("getLightsName: got Lights");
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpExportWorldSDF(gazebo_msgs::ExportWorldSDF::Request &req, gazebo_msgs::ExportWorldSDF::Response &res) {
+  res.sdf_dump = "";
+  if (this->world_ == NULL) return false;
+
+  boost::shared_ptr<msgs::Response> response = gazebo::transport::request(world_->GetName(), "world_sdf");
+
+  msgs::GzString msg;
+  std::string msgData;
+
+  // Make sure the response is correct
+  if (response->response() == "error" || response->type() != msg.GetTypeName()) {
+    return false;
+  }
+
+  // Parse the response message
+  msg.ParseFromString(response->serialized_data());
+  // Parse the string into sdf, so we can check whether a world exists.
+  sdf::SDF sdf_parsed;
+  sdf_parsed.SetFromString(msg.data());
+
+  // Check that sdf contains world
+#if SDF_MAJOR_VERSION > 3
+  if (!sdf_parsed.Root()->HasElement("world")) {
+#else
+  if (!sdf_parsed.root->HasElement("world")) {
+#endif
+    return false;
+  }
+
+#if SDF_MAJOR_VERSION > 3
+  res.sdf_dump = sdf_parsed.Root()->ToString("");
+#else
+  res.sdf_dump = sdf_parsed.root->ToString("");
+#endif
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpSetLightProperties(gazebo_msgs::SetLightProperties::Request &req,
+                                               gazebo_msgs::SetLightProperties::Response &res)
+{
+  gazebo::physics::LightPtr phy_light = world_->Light(req.light_name);
+
+  if (phy_light == nullptr) {
+    res.success = false;
+    res.status_message = std::string("getLightProperties: Requested light ") + req.light_name + std::string(" not found!");
+  }
+  else {
+    gazebo::msgs::Light light;
+
+    phy_light->FillMsg(light);
+
+    light.mutable_diffuse()->set_r(req.diffuse.r);
+    light.mutable_diffuse()->set_g(req.diffuse.g);
+    light.mutable_diffuse()->set_b(req.diffuse.b);
+    light.mutable_diffuse()->set_a(req.diffuse.a);
+
+    light.set_attenuation_constant(req.attenuation_constant);
+    light.set_attenuation_linear(req.attenuation_linear);
+    light.set_attenuation_quadratic(req.attenuation_quadratic);
+
+    gazebonode_->Advertise<gazebo::msgs::Light>("~/light/modify")->Publish(light, true);
+
+    res.success = true;
+  }
+
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpSpawnSDFLight(gazebo_msgs::SpawnModel::Request &req,
+                                       gazebo_msgs::SpawnModel::Response &res)
+{
+  TiXmlDocument gazebo_light_xml;
+  if (nrpUpdateInitialPoseAndModelName(gazebo_light_xml, req, res)) {
+    return true;
+  }
+  // do spawning check if spawn worked, return response
+  const std::string light_name(req.model_name);
+  return spawnAndConform(gazebo_light_xml, light_name, res, true); // true indicates we are passing the SDF description of a light
+}
+
+bool GazeboRosApiPlugin::nrpUpdateInitialPoseAndModelName(TiXmlDocument &gazebo_model_xml,
+                                                          gazebo_msgs::SpawnModel::Request &req,
+                                                          gazebo_msgs::SpawnModel::Response &res)
+{
+  // incoming robot name
+  std::string model_name = req.model_name;
+
+  // get name space for the corresponding model plugins
+  robot_namespace_ = req.robot_namespace;
+
+  // get initial pose of model
+  gazebo::math::Vector3 initial_xyz(req.initial_pose.position.x,req.initial_pose.position.y,req.initial_pose.position.z);
+  // get initial roll pitch yaw (fixed frame transform)
+  gazebo::math::Quaternion initial_q(req.initial_pose.orientation.w,req.initial_pose.orientation.x,req.initial_pose.orientation.y,req.initial_pose.orientation.z);
+
+  // reference frame for initial pose definition, modify initial pose if defined
+  gazebo::physics::LinkPtr frame = boost::dynamic_pointer_cast<gazebo::physics::Link>(world_->GetEntity(req.reference_frame));
+  if (frame)
+  {
+    // convert to relative pose
+    gazebo::math::Pose frame_pose = frame->GetWorldPose();
+    initial_xyz = frame_pose.rot.RotateVector(initial_xyz);
+    initial_xyz += frame_pose.pos;
+    initial_q *= frame_pose.rot;
+  }
+
+  /// @todo: map is really wrong, need to use tf here somehow
+  else if (req.reference_frame == "" || req.reference_frame == "world" || req.reference_frame == "map" || req.reference_frame == "/map")
+  {
+    ROS_DEBUG("SpawnModel: reference_frame is empty/world/map, using inertial frame");
+  }
+  else
+  {
+    res.success = false;
+    res.status_message = "SpawnModel: reference reference_frame not found, did you forget to scope the link by model name?";
+    return true;
+  }
+
+  // incoming robot model string
+  std::string model_xml = req.model_xml;
+
+  // store resulting Gazebo Model XML to be sent to spawn queue
+  // get incoming string containg either an URDF or a Gazebo Model XML
+  // grab from parameter server if necessary convert to SDF if necessary
+  stripXmlDeclaration(model_xml);
+
+  // put string in TiXmlDocument for manipulation
+  gazebo_model_xml.Parse(model_xml.c_str());
+
+  // optional model manipulations: update initial pose && replace model name
+  if (isSDF(model_xml))
+  {
+    updateSDFAttributes(gazebo_model_xml, model_name, initial_xyz, initial_q);
+
+    // Walk recursively through the entire SDF, locate plugin tags and
+    // add robotNamespace as a child with the correct namespace
+    if (!this->robot_namespace_.empty())
+    {
+      // Get root element for SDF
+      TiXmlNode* model_tixml = gazebo_model_xml.FirstChild("sdf");
+      model_tixml = (!model_tixml) ?
+          gazebo_model_xml.FirstChild("gazebo") : model_tixml;
+      if (model_tixml)
+      {
+        walkChildAddRobotNamespace(model_tixml);
+      }
+      else
+      {
+        ROS_WARN("Unable to add robot namespace to xml");
+      }
+    }
+  }
+  else if (isURDF(model_xml))
+  {
+    updateURDFModelPose(gazebo_model_xml, initial_xyz, initial_q);
+    updateURDFName(gazebo_model_xml, model_name);
+
+    // Walk recursively through the entire URDF, locate plugin tags and
+    // add robotNamespace as a child with the correct namespace
+    if (!this->robot_namespace_.empty())
+    {
+      // Get root element for URDF
+      TiXmlNode* model_tixml = gazebo_model_xml.FirstChild("robot");
+      if (model_tixml)
+      {
+        walkChildAddRobotNamespace(model_tixml);
+      }
+      else
+      {
+        ROS_WARN("Unable to add robot namespace to xml");
+      }
+    }
+  }
+  else
+  {
+    ROS_ERROR("GazeboRosApiPlugin SpawnModel Failure: input xml format not recognized");
+    res.success = false;
+    res.status_message = std::string("GazeboRosApiPlugin SpawnModel Failure: input model_xml not SDF or URDF, or cannot be converted to Gazebo compatible format.");
+    return true;
+  }
+
+  // No error occured, we return false
   return false;
 }
 
+// ===================================================
+// END Custom NRP public methods implementation
+// ===================================================
+
+// ===================================================
+// BEGIN Custom NRP private methods implementation
+// ===================================================
+
+
 // HBP helper function
-std::vector<std::string> GazeboRosApiPlugin::split(const std::string &input, const char &token)
+bool GazeboRosApiPlugin::nrpGetVisualFromWorld(const std::string &model_name,
+                                               const std::string &link_name,
+                                               const std::string &visual_name,
+                                               gazebo::msgs::Visual &visualMsg)
 {
-  std::vector<std::string> result;
-  std::string s;
-  std::istringstream f(input);
-  while (getline(f, s, token))
-  {
-    result.push_back(s);
+  gazebo::physics::ModelPtr model = world_->GetModel(model_name);
+  if (model == nullptr)
+    return false;
+
+  gazebo::physics::LinkPtr link = model->GetLink(link_name);
+  if (link == nullptr)
+    return false;
+
+  uint32_t visual_idx;
+  if (!link->VisualId(visual_name, visual_idx))
+    return false;
+
+  visualMsg = link->GetVisualMessage(model_name + std::string("::") + link_name + std::string("::") + visual_name);
+
+  return true;
+}
+
+void GazeboRosApiPlugin::nrpCleanModelMsg(gazebo::msgs::Model &modelMsg) {
+  // Clean up the model message
+  auto joints = modelMsg.mutable_joint();
+  for (unsigned int i = 0; i < joints->size(); i++) {
+    std::cout << modelMsg.name() << " " << joints->Mutable(i)->mutable_name() << std::endl;
+    joints->Mutable(i)->mutable_name()
+      ->replace(0, modelMsg.name().size() + 2, std::string(""));
   }
-  return result;
+
+  auto links = modelMsg.mutable_link();
+  for (unsigned int i = 0; i < links->size(); i++) {
+    auto link = links->Mutable(i);
+    auto collisions = modelMsg.mutable_link(i)->mutable_collision();
+    for (unsigned int j = 0; j < collisions->size(); j++) {
+      collisions->Mutable(j)->mutable_name()
+        ->replace(0, link->name().size() + 2, std::string(""));
+    }
+    std::cout << modelMsg.name() << " " << link->name() << std::endl;
+    link->mutable_name()->replace(0, modelMsg.name().size() + 2, std::string(""));
+  }
 }
 
 // HBP helper function - use one time request publishers to avoid race conditions with scene updates
 // and other concurrent deletes, adding mutex-es in the above code with a class level publisher
 // does not resolve the issue, this plugin should be refactored in the future
-void GazeboRosApiPlugin::publishRequest(const std::string &type, const std::string &value) {
+void GazeboRosApiPlugin::nrpPublishRequest(const std::string &type, const std::string &value) {
   gazebo::transport::PublisherPtr pub = gazebonode_->Advertise<gazebo::msgs::Request>("~/request");
   gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest(type, value);
-  pub->Publish(*msg,true);
+  pub->Publish(*msg, true);
 }
+
+void GazeboRosApiPlugin::nrpPublishJointStates()
+{
+  gazebo_msgs::JointStates joint_states;
+  for (unsigned int i = 0; i < world_->GetModelCount(); i ++)
+  {
+    gazebo::physics::ModelPtr model = world_->GetModel(i);
+    gazebo::physics::Joint_V model_joints = model->GetJoints();
+
+    for (unsigned int j = 0; j < model_joints.size(); j++)
+    {
+      gazebo::physics::JointPtr joint = model_joints[j];
+      joint_states.name.push_back(model->GetName() + "::" + joint->GetName());
+      joint_states.position.push_back(joint->GetAngle(0).Radian());
+
+      joint_states.rate.push_back(joint->GetVelocity(0));
+
+      gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
+      gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
+
+      geometry_msgs::Vector3 axis0;
+      axis0.x = vec_axis0.x;
+      axis0.y = vec_axis0.y;
+      axis0.z = vec_axis0.z;
+
+      geometry_msgs::Vector3 axis1;
+      axis1.x = vec_axis1.x;
+      axis1.y = vec_axis1.y;
+      axis1.z = vec_axis1.z;
+
+      joint_states.axes.push_back(axis0);
+      joint_states.axes.push_back(axis1);
+
+      gazebo::physics::JointWrench jw = joint->GetForceTorque(0);
+
+      geometry_msgs::Vector3 body1_force;
+      body1_force.x = jw.body1Force.x;
+      body1_force.y = jw.body1Force.y;
+      body1_force.z = jw.body1Force.z;
+
+      joint_states.body1Forces.push_back(body1_force);
+
+      geometry_msgs::Vector3 body2_force;
+      body2_force.x = jw.body2Force.x;
+      body2_force.y = jw.body2Force.y;
+      body2_force.z = jw.body2Force.z;
+
+      joint_states.body2Forces.push_back(body2_force);
+
+      geometry_msgs::Vector3 body1_torque;
+      body1_torque.x = jw.body1Torque.x;
+      body1_torque.y = jw.body1Torque.y;
+      body1_torque.z = jw.body1Torque.z;
+
+      joint_states.body1Torques.push_back(body1_torque);
+
+      geometry_msgs::Vector3 body2_torque;
+      body2_torque.x = jw.body2Torque.x;
+      body2_torque.y = jw.body2Torque.y;
+      body2_torque.z = jw.body2Torque.z;
+
+      joint_states.body2Torques.push_back(body2_torque);
+    }
+  }
+  nrp_pub_joint_states_.publish(joint_states);
+}
+
+// ===================================================
+// END Custom NRP private methods implementation
+// ===================================================
 
 // Register this plugin with the simulator
 GZ_REGISTER_SYSTEM_PLUGIN(GazeboRosApiPlugin)
 }
-

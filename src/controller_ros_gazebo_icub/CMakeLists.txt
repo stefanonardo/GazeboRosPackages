@@ -95,7 +95,7 @@ catkin_package(
 #  INCLUDE_DIRS include
  LIBRARIES controller_ros_gazebo_icub
  CATKIN_DEPENDS gazebo_ros roscpp
- DEPENDS system_lib
+# DEPENDS system_lib
 )
 
 ###########

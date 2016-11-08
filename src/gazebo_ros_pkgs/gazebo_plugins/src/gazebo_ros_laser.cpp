@@ -67,21 +67,15 @@ void GazeboRosLaser::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   // load plugin
   RayPlugin::Load(_parent, this->sdf);
   // Get the world name.
-#if GAZEBO_MAJOR_VERSION > 6
   std::string worldName = _parent->WorldName();
-#else
-  std::string worldName = _parent->GetWorldName();
-#endif
   this->world_ = physics::get_world(worldName);
   // save pointers
   this->sdf = _sdf;
 
+  GAZEBO_SENSORS_USING_DYNAMIC_POINTER_CAST;
   this->parent_ray_sensor_ =
-#if GAZEBO_MAJOR_VERSION <= 6
-    boost::dynamic_pointer_cast<sensors::RaySensor>(_parent);
-#else
-    std::dynamic_pointer_cast<sensors::RaySensor>(_parent);
-#endif
+    dynamic_pointer_cast<sensors::RaySensor>(_parent);
+
   if (!this->parent_ray_sensor_)
     gzthrow("GazeboRosLaser controller requires a Ray Sensor as its parent");
 
@@ -168,11 +162,7 @@ void GazeboRosLaser::LaserConnect()
   this->laser_connect_count_++;
   if (this->laser_connect_count_ == 1)
     this->laser_scan_sub_ =
-#if GAZEBO_MAJOR_VERSION > 6
       this->gazebo_node_->Subscribe(this->parent_ray_sensor_->Topic(),
-#else
-      this->gazebo_node_->Subscribe(this->parent_ray_sensor_->GetTopic(),
-#endif
                                     &GazeboRosLaser::OnScan, this);
 }
 

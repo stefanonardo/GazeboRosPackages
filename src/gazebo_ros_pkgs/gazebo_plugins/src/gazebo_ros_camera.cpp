@@ -26,7 +26,6 @@
 
 #include <string>
 
-#include <gazebo/common/Events.hh>
 #include <gazebo/sensors/Sensor.hh>
 #include <gazebo/sensors/CameraSensor.hh>
 #include <gazebo/sensors/SensorTypes.hh>
@@ -46,9 +45,6 @@ GazeboRosCamera::GazeboRosCamera()
 // Destructor
 GazeboRosCamera::~GazeboRosCamera()
 {
-#if GAZEBO_MAJOR_VERSION >= 6
-  event::Events::DisconnectWorldReset(this->resetEventConnection);
-#endif
   ROS_DEBUG_STREAM_NAMED("camera","Unloaded");
 }
 
@@ -71,11 +67,6 @@ void GazeboRosCamera::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   this->format_ = this->format;
   this->camera_ = this->camera;
 
-#if GAZEBO_MAJOR_VERSION >= 6
-  // Connect to the reset event.
-  this->resetEventConnection = event::Events::ConnectWorldReset(boost::bind(&CameraPlugin::Reset, this));
-#endif
-
   GazeboRosCameraUtils::Load(_parent, _sdf);
 }
 
@@ -85,11 +76,7 @@ void GazeboRosCamera::OnNewFrame(const unsigned char *_image,
     unsigned int _width, unsigned int _height, unsigned int _depth,
     const std::string &_format)
 {
-#if GAZEBO_MAJOR_VERSION > 6
   this->sensor_update_time_ = this->parentSensor_->LastUpdateTime();
-#else
-  this->sensor_update_time_ = this->parentSensor_->GetLastUpdateTime();
-#endif
 
   if (!this->parentSensor->IsActive())
   {
@@ -111,10 +98,4 @@ void GazeboRosCamera::OnNewFrame(const unsigned char *_image,
     }
   }
 }
-
-
-void GazeboRosCamera::Reset() {
-  this->last_update_time_ = 0.0;
 }
-
-} // end namespace gazebo

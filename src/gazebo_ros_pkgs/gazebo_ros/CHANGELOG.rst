@@ -2,6 +2,131 @@
 Changelog for package gazebo_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.5.7 (2016-06-10)
+------------------
+
+2.5.6 (2016-04-28)
+------------------
+* Remove deprecated spawn_gazebo_model service
+* Contributors: Steven Peters
+
+2.5.5 (2016-04-27)
+------------------
+* merge indigo, jade to kinetic-devel
+* Upgrade to gazebo 7 and remove deprecated driver_base dependency
+  * Upgrade to gazebo 7 and remove deprecated driver_base dependency
+  * disable gazebo_ros_control until dependencies are met
+  * Remove stray backslash
+* spawn_model: adding -b option to bond to the model and delete it on sigint
+* Update maintainer for Kinetic release
+* Allow respawning gazebo node.
+* Contributors: Hugo Boyer, Isaac IY Saito, Jackie Kay, Jonathan Bohren, Jose Luis Rivero, Steven Peters
+
+2.5.3 (2016-04-11)
+------------------
+* Include binary in runtime
+* Remove ROS remapping arguments from gazebo_ros launch scripts.
+* Contributors: Jose Luis Rivero, Martin Pecka
+
+2.5.2 (2016-02-25)
+------------------
+* merging from indigo-devel
+* Merge pull request `#302 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/302>`_ from maxbader/jade-devel-GetModelState
+  Header for GetModelState service request for jade-devel
+* Fix invalid signal name on OS X
+  scripts/gazebo: line 30: kill: SIGINT: invalid signal specification
+* Fix invalid signal name on OS X
+  scripts/gazebo: line 30: kill: SIGINT: invalid signal specification
+* Restart package resolving from last position, do not start all over.
+* 2.4.9
+* Generate changelog
+* Import changes from jade-branch
+* Add range world and launch file
+* fix crash
+* Set GAZEBO_CXX_FLAGS to fix c++11 compilation errors
+* GetModelState modification for jade
+* Contributors: Bence Magyar, Boris Gromov, Guillaume Walck, Ian Chen, John Hsu, Jose Luis Rivero, Markus Bader, Steven Peters, hsu
+
+2.5.1 (2015-08-16)
+------------------
+* Port of Pal Robotics range sensor plugin to Jade
+* Added a comment about the need of libgazebo5-dev in runtime
+* Added missing files
+* Added elevator plugin
+* Use c++11
+* run_depend on libgazebo5-dev (`#323 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/323>`_)
+  Declare the dependency.
+  It can be fixed later if we don't want it.
+* Contributors: Jose Luis Rivero, Nate Koenig, Steven Peters
+
+* Port of Pal Robotics range sensor plugin to Jade
+* Added a comment about the need of libgazebo5-dev in runtime
+* Added missing files
+* Added elevator plugin
+* Use c++11
+* run_depend on libgazebo5-dev
+* Contributors: Jose Luis Rivero, Nate Koenig, Steven Peters
+
+2.5.0 (2015-04-30)
+------------------
+* run_depend on libgazebo5-dev instead of gazebo5
+* Changed the rosdep key for gazebo to gazebo5, for Jade Gazebo5 will be used.
+* Contributors: Steven Peters, William Woodall
+
+2.4.10 (2016-02-25)
+-------------------
+* Fix invalid signal name on OS X
+  scripts/gazebo: line 30: kill: SIGINT: invalid signal specification
+* Restart package resolving from last position, do not start all over.
+* Contributors: Boris Gromov, Guillaume Walck
+
+2.4.9 (2015-08-16)
+------------------
+* Import changes from jade-branch
+* Add range world and launch file
+* fix crash
+* Set GAZEBO_CXX_FLAGS to fix c++11 compilation errors
+* Contributors: Bence Magyar, Ian Chen, Jose Luis Rivero, Steven Peters
+
+2.4.8 (2015-03-17)
+------------------
+* Specify physics engine in args to empty_world.launch
+* Contributors: Steven Peters
+
+2.4.7 (2014-12-15)
+------------------
+* temporary hack to **fix** the -J joint position option (issue `#93 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/93>`_), sleeping for 1 second to avoid race condition. this branch should only be used for debugging, merge only as a last resort.
+* Fixing set model state method and test
+* Extended the fix for `#246 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/246>`_ also to debug, gazebo, gzclient and perf scripts.
+* Update Gazebo/ROS tutorial URL
+* [gazebo_ros] Fix for `#246 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/246>`_
+  Fixing issue `#246 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/246>`_ in gzserver.
+* Fixing handling of non-world frame velocities in setModelState.
+* update headers to apache 2.0 license
+* update headers to apache 2.0 license
+* Contributors: John Hsu, Jose Luis Rivero, Martin Pecka, Tom Moore, ayrton04
+
+2.4.6 (2014-09-01)
+------------------
+* Merge pull request `#232 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/232>`_ from ros-simulation/fix_get_physics_properties_non_ode
+  Fix get physics properties non ode
+* Merge pull request `#183 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/183>`_ from ros-simulation/issue_182
+  Fix STL iterator errors, misc. cppcheck (`#182 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/182>`_)
+* check physics engine type before calling set_physics_properties and get_physics_properteis
+* check physics engine type before calling set_physics_properties and get_physics_properteis
+* Fixes for calling GetParam() with different physic engines.
+* 2.3.6
+* Update changelogs for the upcoming release
+* Fixed boost any cast
+* Removed a few warnings
+* Update for hydro + gazebo 1.9
+* Fix build with gazebo4 and indigo
+* Fix STL iterator errors, misc. cppcheck (`#182 <https://github.com/ros-simulation/gazebo_ros_pkgs/issues/182>`_)
+  There were some errors in STL iterators.
+  Initialized values of member variables in constructor.
+  Removed an unused variable (model_name).
+* Contributors: Carlos Agüero, John Hsu, Jose Luis Rivero, Nate Koenig, Steven Peters, hsu, osrf
+
 2.4.5 (2014-08-18)
 ------------------
 * Port fix_build branch for indigo-devel
