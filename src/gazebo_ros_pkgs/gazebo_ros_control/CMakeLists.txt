@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gazebo_ros_control)
 
+# Check c++11 / c++0x
+# Added for NRP
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+    message(STATUS "Compiler supports cxx11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+elseif(COMPILER_SUPPORTS_CXX0X)
+    message(STATUS "Compiler supports c++0x")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif()
+# End of NRP check
+
 # Load catkin and all dependencies required for this package
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -17,6 +31,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # Depend on system install of Gazebo 
 find_package(gazebo REQUIRED)
+find_package(OGRE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 
 catkin_package(
@@ -38,10 +53,12 @@ catkin_package(
 
 link_directories(
   ${GAZEBO_LIBRARY_DIRS}
+  ${OGRE_LIBRARY_DIRS}
   ${catkin_LIBRARY_DIRS}
 )
 
 include_directories(include
+  ${TBB_INCLUDE_DIR}
   ${Boost_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}

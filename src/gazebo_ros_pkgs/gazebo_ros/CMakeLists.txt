@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gazebo_ros)
 
+# Check c++11 / c++0x
+# Added for NRP
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+if(COMPILER_SUPPORTS_CXX11)
+    message(STATUS "Compiler supports cxx11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+elseif(COMPILER_SUPPORTS_CXX0X)
+    message(STATUS "Compiler supports c++0x")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif()
+# End of NRP check
+
 find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   roslib
@@ -28,6 +42,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 
 find_package(Boost REQUIRED COMPONENTS thread)
 
+add_definitions(-DTIXML_USE_STL)
 find_package(TinyXML REQUIRED)
 
 catkin_python_setup()
@@ -55,15 +70,18 @@ catkin_package(
     TinyXML
 )
 
-include_directories(
-  include
+include_directories(  include
+  ${TBB_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
   ${SDFormat_INCLUDE_DIRS}
   ${TinyXML_INCLUDE_DIRS})
 
-link_directories(${catkin_LIBRARY_DIRS})
+link_directories(
+  ${OGRE_LIBRARY_DIRS}
+  ${catkin_LIBRARY_DIRS}
+)
 
 set(cxx_flags)
 foreach (item ${GAZEBO_CFLAGS})
