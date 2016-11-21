@@ -48,7 +48,7 @@
 #include "gazebo_msgs/JointRequest.h"
 #include "gazebo_msgs/BodyRequest.h"
 
-#include "gazebo_msgs/SpawnModel.h"
+#include "gazebo_msgs/SpawnEntity.h"
 #include "gazebo_msgs/DeleteModel.h"
 
 #include "gazebo_msgs/ApplyBodyWrench.h"
@@ -176,10 +176,11 @@ public:
   void onModelStatesDisconnect();
 
   /// \brief Function for inserting a URDF into Gazebo from ROS Service Call
-  bool spawnURDFModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
+  bool spawnURDFEntity(gazebo_msgs::SpawnEntity::Request &req,
+                       gazebo_msgs::SpawnEntity::Response &res);
 
   /// \brief Both SDFs and converted URDFs get sent to this function for further manipulation from a ROS Service call
-  bool spawnSDFModel(gazebo_msgs::SpawnModel::Request &req,gazebo_msgs::SpawnModel::Response &res);
+  bool spawnSDFEntity(gazebo_msgs::SpawnEntity::Request &req,gazebo_msgs::SpawnEntity::Response &res);
 
   /// \brief delete model given name
   bool deleteModel(gazebo_msgs::DeleteModel::Request &req,gazebo_msgs::DeleteModel::Response &res);
@@ -312,15 +313,6 @@ public:
   bool nrpSetLightProperties(gazebo_msgs::SetLightProperties::Request &req,
                              gazebo_msgs::SetLightProperties::Response &res);
 
-  /// \brief Light SDFs gets sent to this function for further manipulation from a ROS Service call
-  bool nrpSpawnSDFLight(gazebo_msgs::SpawnModel::Request &req,
-                        gazebo_msgs::SpawnModel::Response &res);
-
-  /// \brief
-  bool nrpUpdateInitialPoseAndModelName(TiXmlDocument &gazebo_model_xml,
-                                        gazebo_msgs::SpawnModel::Request &req,
-                                        gazebo_msgs::SpawnModel::Response &res);
-
   // ===================================================
   // END Custom NRP public attributes & methods
   // ===================================================
@@ -357,11 +349,11 @@ private:
   void updateURDFName(TiXmlDocument &gazebo_model_xml, std::string model_name);
 
   /// \brief
-  void walkChildAddRobotNamespace(TiXmlNode* robot_xml);
+  void walkChildAddRobotNamespace(TiXmlNode* robot_xml, std::string &entity_namespace);
 
   /// \brief
   bool spawnAndConform(TiXmlDocument &gazebo_model_xml, std::string model_name,
-                       gazebo_msgs::SpawnModel::Response &res, bool isLight = false);
+                       gazebo_msgs::SpawnEntity::Response &res);
 
   /// \brief helper function for applyBodyWrench
   ///        shift wrench from reference frame to target frame
@@ -400,8 +392,6 @@ private:
   bool stop_;
   gazebo::event::ConnectionPtr sigint_event_;
 
-  std::string robot_namespace_;
-
   gazebo::transport::NodePtr gazebonode_;
   gazebo::transport::SubscriberPtr stat_sub_;
   gazebo::transport::PublisherPtr factory_pub_;
@@ -420,8 +410,8 @@ private:
   gazebo::event::ConnectionPtr pub_model_states_event_;
   gazebo::event::ConnectionPtr load_gazebo_ros_api_plugin_event_;
 
-  ros::ServiceServer spawn_sdf_model_service_;
-  ros::ServiceServer spawn_urdf_model_service_;
+  ros::ServiceServer spawn_sdf_entity_service_;
+  ros::ServiceServer spawn_urdf_entity_service_;
   ros::ServiceServer delete_model_service_;
   ros::ServiceServer get_model_state_service_;
   ros::ServiceServer get_model_properties_service_;
@@ -499,7 +489,6 @@ private:
   // BEGIN Custom NRP private attributes & methods
   // ===================================================
 
-  ros::ServiceServer nrp_spawn_sdf_light_service_;
   ros::ServiceServer nrp_advance_simulation_service_;
   ros::ServiceServer nrp_reset_sim_time_service_;
   ros::ServiceServer nrp_reset_sim_service_;

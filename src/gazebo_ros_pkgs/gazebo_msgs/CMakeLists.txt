@@ -33,7 +33,7 @@ add_service_files(DIRECTORY srv FILES
   GetPhysicsProperties.srv
   SetJointProperties.srv
   SetModelConfiguration.srv
-  SpawnModel.srv
+  SpawnEntity.srv
   ApplyJointEffort.srv
   GetJointProperties.srv
   GetModelProperties.srv
@@ -55,7 +55,7 @@ add_service_files(DIRECTORY srv FILES
   GetLightsName.srv
   GetVisualProperties.srv
   SetLightProperties.srv
-  SetVisualProperties.srv 
+  SetVisualProperties.srv
   )
 
 generate_messages(DEPENDENCIES
