@@ -1,8 +1,0 @@
-# goal
-string MessageID
----
-# result
-string MessageResult
----
-# feedback message
-string MessageFeedback

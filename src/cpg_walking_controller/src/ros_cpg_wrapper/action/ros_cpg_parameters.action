@@ -1,5 +1,0 @@
-float32[] cpg_parameters
----
-string ParamMessageResponse
----
-string ParamMessageFeedback
