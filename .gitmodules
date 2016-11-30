@@ -1,0 +1,3 @@
+[submodule "src/gazebo_dvs_plugin"]
+	path = src/gazebo_dvs_plugin
+	url = https://github.com/HBPNeurorobotics/gazebo_dvs_plugin.git
