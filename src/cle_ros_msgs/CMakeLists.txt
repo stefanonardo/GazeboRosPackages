@@ -79,6 +79,7 @@ add_service_files(
    SetStructuredTransferFunction.srv
    SetTransferFunction.srv
    Trigger.srv
+   ExtendTimeout.srv
 )
 
 ## Generate actions in the 'action' folder
