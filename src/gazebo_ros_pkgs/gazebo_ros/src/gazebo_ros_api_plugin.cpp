@@ -327,14 +327,6 @@ void GazeboRosApiPlugin::advertiseServices()
                                                             ros::VoidPtr(), &gazebo_queue_);
   pub_model_states_ = nh_->advertise(pub_model_states_ao);
 
-  // publish complete joint states in world frame
-  ros::AdvertiseOptions pub_joint_states_ao =
-    ros::AdvertiseOptions::create<gazebo_msgs::JointStates>(
-                                                           "joint_states",10,
-                                                           boost::bind(&GazeboRosApiPlugin::nrpOnJointStatesConnect,this),
-                                                           boost::bind(&GazeboRosApiPlugin::nrpOnJointStatesDisconnect,this),
-                                                           ros::VoidPtr(), &gazebo_queue_);
-  nrp_pub_joint_states_ = nh_->advertise(pub_joint_states_ao);
 
   // Advertise more services on the custom queue
   std::string set_link_properties_service_name("set_link_properties");
@@ -2345,23 +2337,6 @@ bool GazeboRosApiPlugin::spawnAndConform(TiXmlDocument &gazebo_model_xml, std::s
 // BEGIN Custom NRP public methods implementation
 // ===================================================
 
-void GazeboRosApiPlugin::nrpOnJointStatesConnect()
-{
-  nrp_pub_joint_states_connection_count_++;
-  if (nrp_pub_joint_states_connection_count_ == 1) // connect on first subscriber
-    nrp_pub_joint_states_event_   = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&GazeboRosApiPlugin::nrpPublishJointStates, this));
-}
-
-void GazeboRosApiPlugin::nrpOnJointStatesDisconnect()
-{
-  nrp_pub_joint_states_connection_count_--;
-  if (nrp_pub_joint_states_connection_count_ <= 0) // disconnect with no subscribers
-  {
-    gazebo::event::Events::DisconnectWorldUpdateBegin(nrp_pub_joint_states_event_);
-    if (nrp_pub_joint_states_connection_count_ < 0) // should not be possible
-      ROS_ERROR("one too mandy disconnect from nrp_pub_joint_states_ in gazebo_ros.cpp? something weird");
-  }
-}
 
 void GazeboRosApiPlugin::nrpAdvertiseServices() {
   // Advertise more services on the custom queue
@@ -2940,72 +2915,6 @@ void GazeboRosApiPlugin::nrpPublishRequest(const std::string &type, const std::s
   gazebo::transport::PublisherPtr pub = gazebonode_->Advertise<gazebo::msgs::Request>("~/request");
   gazebo::msgs::Request *msg = gazebo::msgs::CreateRequest(type, value);
   pub->Publish(*msg, true);
-}
-
-void GazeboRosApiPlugin::nrpPublishJointStates()
-{
-  gazebo_msgs::JointStates joint_states;
-  for (unsigned int i = 0; i < world_->GetModelCount(); i ++)
-  {
-    gazebo::physics::ModelPtr model = world_->GetModel(i);
-    gazebo::physics::Joint_V model_joints = model->GetJoints();
-
-    for (unsigned int j = 0; j < model_joints.size(); j++)
-    {
-      gazebo::physics::JointPtr joint = model_joints[j];
-      joint_states.name.push_back(model->GetName() + "::" + joint->GetName());
-      joint_states.position.push_back(joint->GetAngle(0).Radian());
-
-      joint_states.rate.push_back(joint->GetVelocity(0));
-
-      gazebo::math::Vector3 vec_axis0 = joint->GetLocalAxis(0);
-      gazebo::math::Vector3 vec_axis1 = joint->GetLocalAxis(1);
-
-      geometry_msgs::Vector3 axis0;
-      axis0.x = vec_axis0.x;
-      axis0.y = vec_axis0.y;
-      axis0.z = vec_axis0.z;
-
-      geometry_msgs::Vector3 axis1;
-      axis1.x = vec_axis1.x;
-      axis1.y = vec_axis1.y;
-      axis1.z = vec_axis1.z;
-
-      joint_states.axes.push_back(axis0);
-      joint_states.axes.push_back(axis1);
-
-      gazebo::physics::JointWrench jw = joint->GetForceTorque(0);
-
-      geometry_msgs::Vector3 body1_force;
-      body1_force.x = jw.body1Force.x;
-      body1_force.y = jw.body1Force.y;
-      body1_force.z = jw.body1Force.z;
-
-      joint_states.body1Forces.push_back(body1_force);
-
-      geometry_msgs::Vector3 body2_force;
-      body2_force.x = jw.body2Force.x;
-      body2_force.y = jw.body2Force.y;
-      body2_force.z = jw.body2Force.z;
-
-      joint_states.body2Forces.push_back(body2_force);
-
-      geometry_msgs::Vector3 body1_torque;
-      body1_torque.x = jw.body1Torque.x;
-      body1_torque.y = jw.body1Torque.y;
-      body1_torque.z = jw.body1Torque.z;
-
-      joint_states.body1Torques.push_back(body1_torque);
-
-      geometry_msgs::Vector3 body2_torque;
-      body2_torque.x = jw.body2Torque.x;
-      body2_torque.y = jw.body2Torque.y;
-      body2_torque.z = jw.body2Torque.z;
-
-      joint_states.body2Torques.push_back(body2_torque);
-    }
-  }
-  nrp_pub_joint_states_.publish(joint_states);
 }
 
 // ===================================================

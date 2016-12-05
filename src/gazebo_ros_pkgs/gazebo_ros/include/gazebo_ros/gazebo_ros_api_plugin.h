@@ -109,8 +109,6 @@
 #include "gazebo_msgs/GetLightsName.h"
 #include "gazebo_msgs/DeleteLight.h"
 
-#include "gazebo_msgs/JointStates.h"
-
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -258,12 +256,6 @@ public:
   // ===================================================
   // BEGIN Custom NRP public attributes & methods
   // ===================================================
-
-  /// \brief
-  void nrpOnJointStatesConnect();
-
-  /// \brief
-  void nrpOnJointStatesDisconnect();
 
   /// \brief advertise custom services for the NRP
   void nrpAdvertiseServices();
@@ -523,10 +515,6 @@ private:
 
   int nrp_export_sdf_count_;
 
-  ros::Publisher     nrp_pub_joint_states_;
-  int                nrp_pub_joint_states_connection_count_;
-  gazebo::event::ConnectionPtr nrp_pub_joint_states_event_;
-
   // helper function
   bool nrpRequestSceneUpdate();
 
@@ -540,9 +528,6 @@ private:
 
   // helper function
   void nrpPublishRequest(const std::string &type, const std::string &value);
-
-  /// \brief
-  void nrpPublishJointStates();
 
   // ===================================================
   // END Custom NRP private attributes & methods
