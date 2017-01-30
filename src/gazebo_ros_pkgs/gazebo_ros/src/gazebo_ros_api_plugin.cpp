@@ -1277,6 +1277,15 @@ bool GazeboRosApiPlugin::setModelState(gazebo_msgs::SetModelState::Request &req,
                                        gazebo_msgs::SetModelState::Response &res)
 {
   gazebo::math::Vector3 target_pos(req.model_state.pose.position.x,req.model_state.pose.position.y,req.model_state.pose.position.z);
+
+  if(req.model_state.scale.x == 0 || req.model_state.scale.y == 0 || req.model_state.scale.z == 0) {
+
+    ROS_DEBUG("SetModelState: scale cannot be 0");
+    res.success = false;
+    res.status_message = "SetModelState: scale cannot be 0";
+    return true;
+  }
+
   gazebo::math::Vector3 target_scale(req.model_state.scale.x,req.model_state.scale.y,req.model_state.scale.z);
   gazebo::math::Quaternion target_rot(req.model_state.pose.orientation.w,req.model_state.pose.orientation.x,req.model_state.pose.orientation.y,req.model_state.pose.orientation.z);
   target_rot.Normalize(); // eliminates invalid rotation (0, 0, 0, 0)
@@ -1331,7 +1340,9 @@ bool GazeboRosApiPlugin::setModelState(gazebo_msgs::SetModelState::Request &req,
     bool is_paused = world_->IsPaused();
     world_->SetPaused(true);
     model->SetWorldPose(target_pose, true, true);//tell gzserver to publish the new pose on ~/pose/info
-    model->SetScale(target_scale.Ign(), true);//and the scale on ~/model/info
+
+    model->SetScale(target_scale.Ign(), true); //and the scale on ~/model/info
+
     world_->SetPaused(is_paused);
     //gazebo::math::Pose p3d = model->GetWorldPose();
     //ROS_ERROR("model updated state: %f %f %f",p3d.pos.x,p3d.pos.y,p3d.pos.z);
