@@ -160,9 +160,8 @@ namespace gazebo
 
     void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     {
-      cout << "[ROS CONTROLLER] controller initialized" << endl;
-
-      string argument;
+      // Store the pointer to the model
+      this->model = _parent;
 
       if (!_sdf->HasElement("degree"))
       {
@@ -182,7 +181,11 @@ namespace gazebo
         std::cout << "Wrong value for the parameter <degree> in ROSController_iCub, default to radiants" << std::endl;
         this->DegOrRad = 1;
       }
+    }
 
+    void Init()
+    {
+      cout << "[ROS CONTROLLER] controller initialized" << endl;
 
       if (!ros::isInitialized())
       {
@@ -191,8 +194,6 @@ namespace gazebo
         return;
       }
 
-      // Store the pointer to the model
-      this->model = _parent;
       this->jointControl = this->model->GetJointController();
       this->joints = this->jointControl->GetJoints();
 

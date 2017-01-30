@@ -22,6 +22,8 @@
 
 #include <gazebo/common/Events.hh>
 #include <gazebo/gazebo_config.h>
+#include <gazebo/rendering/RenderingIface.hh>
+#include <gazebo/rendering/Scene.hh>
 #include <gazebo_ros/gazebo_ros_api_plugin.h>
 
 namespace gazebo
@@ -2475,6 +2477,14 @@ void GazeboRosApiPlugin::nrpAdvertiseServices() {
                                                           ros::VoidPtr(), &gazebo_queue_);
   nrp_export_world_sdf_service_ = nh_->advertiseService(export_world_sdf_aso);
 
+  // Wait for gserver rendering environment (if necessary) to be fully loaded for use by sensors/etc.
+  std::string wait_for_rendering_service_name("wait_for_rendering");
+  ros::AdvertiseServiceOptions wait_for_rendering_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          wait_for_rendering_service_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpWaitForRendering,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_wait_for_rendering_service_ = nh_->advertiseService(wait_for_rendering_aso);
 }
 
 bool GazeboRosApiPlugin::nrpAdvanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
@@ -2751,6 +2761,46 @@ bool GazeboRosApiPlugin::nrpSetLightProperties(gazebo_msgs::SetLightProperties::
     res.success = true;
   }
 
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpWaitForRendering(std_srvs::Empty::Request &req,
+                                             std_srvs::Empty::Response &res)
+{
+
+  // Check if a rendering scene exists, one will be created immediately when an object that
+  // requires one is inserted (e.g. a robot with a camera sensor). If one does not exist, then
+  // there is no need to wait for the rendeirng environment.
+  gazebo::rendering::ScenePtr scene = rendering::get_scene(world_->GetName());
+  if (scene == nullptr)
+    return true;
+
+  // If paused, advance the simulation physics by 1 iteration, this will not impact the
+  // brain->robot sync but is required to ensure sensors and plugins load as quickly as possible,
+  // otherwise they will sit idle for 5 seconds each before fully loading.
+  if (world_->IsPaused())
+    world_->Step(1);
+
+  // Wait until the world (e.g. models/sensors/plugins loaded via this plugin) matches the items
+  // in the rendering scene (e.g. all meshes/textures/sensors/plugins are loaded). Without this,
+  // the world (our reference) is out of sync with the rendering environment (the sensor/camera
+  // reference) and things dependent on the rendered scene will be blocking/out of sync.
+  bool waiting = true;
+  while (waiting) {
+    waiting = false;
+
+    for (gazebo::physics::LightPtr light : world_->Lights())
+      waiting = (scene->GetLight(light->GetName()) == nullptr) || waiting;
+
+    for (gazebo::physics::ModelPtr model : world_->GetModels())
+      waiting = (scene->GetVisual(model->GetName()) == nullptr) || waiting;
+
+    if (waiting)
+      usleep(250 * 1000); // 0.25s between checks, full environment loading can take a few seconds
+  }
+
+  // Done waiting, everything has been loaded in the rendering environment. This will succeed even if
+  // textures and things are missing.
   return true;
 }
 

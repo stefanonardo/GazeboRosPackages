@@ -305,6 +305,10 @@ public:
   bool nrpSetLightProperties(gazebo_msgs::SetLightProperties::Request &req,
                              gazebo_msgs::SetLightProperties::Response &res);
 
+  /// \brief
+  bool nrpWaitForRendering(std_srvs::Empty::Request &req,
+                           std_srvs::Empty::Response &res);
+
   // ===================================================
   // END Custom NRP public attributes & methods
   // ===================================================
@@ -493,6 +497,7 @@ private:
   ros::ServiceServer nrp_get_light_properties_service_;
   ros::ServiceServer nrp_set_light_properties_service_;
   ros::ServiceServer nrp_export_world_sdf_service_;
+  ros::ServiceServer nrp_wait_for_rendering_service_;
 
   gazebo::transport::PublisherPtr nrp_factory_light_pub_;
 

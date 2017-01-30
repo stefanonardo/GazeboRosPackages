@@ -17,13 +17,6 @@ namespace gazebo
     {
       // Store the pointer to the model
       this->model = _parent;
-      this->jointControl = this->model->GetJointController();
-      this->joints = this->jointControl->GetJoints();
-
-      // Listen to the update event. This event is broadcast every
-      // simulation iteration.
-      this->updateConnection = event::Events::ConnectWorldUpdateBegin(
-          boost::bind(&Init_iCub::OnUpdate, this, _1));
 
       // control method
       if (!_sdf->HasElement("control_method"))
@@ -44,6 +37,17 @@ namespace gazebo
         std::cout << "Wrong value for the parameter <control_method> in icub_initialization, default to position" << std::endl;
         this->startingPolicy = true;
       }
+    }
+
+    void Init()
+    {
+      this->jointControl = this->model->GetJointController();
+      this->joints = this->jointControl->GetJoints();
+
+      // Listen to the update event. This event is broadcast every
+      // simulation iteration.
+      this->updateConnection = event::Events::ConnectWorldUpdateBegin(
+          boost::bind(&Init_iCub::OnUpdate, this, _1));
 
       common::PID posPID = this->jointControl->GetPositionPIDs().at(this->model->GetName() + "::torso_yaw");
       common::PID velPID = this->jointControl->GetVelocityPIDs().at(this->model->GetName() + "::torso_yaw");
