@@ -2611,7 +2611,7 @@ if (!nrpGetVisualFromWorld(req.model_name, req.link_name, req.visual_name, visua
     res.status_message = std::string("setVisualProperties: Requested visual ") + req.visual_name + std::string(" not found!");
     return true;
   }
-
+    
   if (req.property_name != "material:script:name") {
     res.success = false;
     res.status_message = std::string("nrpSetVisualProperties: Could not set visual property ") +
@@ -2649,7 +2649,7 @@ if (!nrpGetVisualFromWorld(req.model_name, req.link_name, req.visual_name, visua
   }
 
   nrpCleanModelMsg(modelMsg);
-  std::cout << modelMsg.DebugString() << std::endl;
+  //std::cout << modelMsg.DebugString() << std::endl;
   // Create a publisher on the ~/model/modify topic
   gazebo::transport::PublisherPtr model_pub =
     gazebonode_->Advertise<gazebo::msgs::Model>("~/model/modify");
@@ -2851,7 +2851,7 @@ void GazeboRosApiPlugin::nrpCleanModelMsg(gazebo::msgs::Model &modelMsg) {
   // Clean up the model message
   auto joints = modelMsg.mutable_joint();
   for (unsigned int i = 0; i < joints->size(); i++) {
-    std::cout << modelMsg.name() << " " << joints->Mutable(i)->mutable_name() << std::endl;
+    //std::cout << modelMsg.name() << " " << joints->Mutable(i)->mutable_name() << std::endl;
     joints->Mutable(i)->mutable_name()
       ->replace(0, modelMsg.name().size() + 2, std::string(""));
   }
@@ -2864,7 +2864,7 @@ void GazeboRosApiPlugin::nrpCleanModelMsg(gazebo::msgs::Model &modelMsg) {
       collisions->Mutable(j)->mutable_name()
         ->replace(0, link->name().size() + 2, std::string(""));
     }
-    std::cout << modelMsg.name() << " " << link->name() << std::endl;
+    //std::cout << modelMsg.name() << " " << link->name() << std::endl;
     link->mutable_name()->replace(0, modelMsg.name().size() + 2, std::string(""));
   }
 }
