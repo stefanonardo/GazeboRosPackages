@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(user_controller_plugin)
+project(avatar_control_plugin)
 
 # check c++11 / c++0x
 include(CheckCXXCompilerFlag)
@@ -68,7 +68,7 @@ find_package(OGRE REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES user_controller_plugin
+  LIBRARIES avatar_control_plugin
   CATKIN_DEPENDS gazebo_ros gazebo_msgs roscpp std_msgs
   DEPENDS system_lib
 )
@@ -91,12 +91,12 @@ link_directories(
 )
 
 ## Declare a cpp library
-add_library(user_controller_plugin
-  src/user_controller_plugin.cpp
+add_library(avatar_control_plugin
+  src/avatar_control_plugin.cpp
 )
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(user_controller_plugin
+target_link_libraries(avatar_control_plugin
   ${catkin_LIBRARIES}
   ${GAZEBO_LIBRARIES}
 )
@@ -109,7 +109,7 @@ target_link_libraries(user_controller_plugin
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
 
 ## Mark executables and/or libraries for installation
-install(TARGETS user_controller_plugin
+install(TARGETS avatar_control_plugin
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )
 

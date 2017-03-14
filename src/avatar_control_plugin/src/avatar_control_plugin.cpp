@@ -1,10 +1,10 @@
 /*
  * Desc: Gazebo plugin providing controllers for user interaction
  * This plugin provides ROS topics for user controlled objects.
- * Author: Lars Pfotzer
+ * Author: Sandro Weber (webers@in.tum.de)
  */
 
-#include "user_controller_plugin.h"
+#include "avatar_control_plugin.h"
 
 #include <boost/bind.hpp>
 #include <ros/time.h>
@@ -12,16 +12,16 @@
 namespace gazebo
 {
 
-UserControlPlugin::UserControlPlugin()
+AvatarControlPlugin::AvatarControlPlugin()
 {
 }
 
-UserControlPlugin::~UserControlPlugin()
+AvatarControlPlugin::~AvatarControlPlugin()
 {
   node_handle_.shutdown();
 }
 
-void UserControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
+void AvatarControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 {
   // Store the pointer to the model
   this->model_ = parent;
@@ -43,11 +43,11 @@ void UserControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   this->last_update_time_ = this->model_->GetWorld()->GetSimTime();
 
   // Listen to the update event. This event is broadcast every simulation iteration.
-  eventconnection_update_world_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&UserControlPlugin::OnUpdate, this, _1));
+  eventconnection_update_world_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&AvatarControlPlugin::OnUpdate, this, _1));
 }
 
 // Called by the world update start event
-void UserControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
+void AvatarControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 {
   std::lock_guard<std::mutex> lock(this->mutex_);
 
@@ -93,7 +93,7 @@ void UserControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 
 ///////////////////////////////////////// SDF parser functions ////////////////////////////////////////////
 
-void UserControlPlugin::ParseControllers(const sdf::ElementPtr &sdf)
+void AvatarControlPlugin::ParseControllers(const sdf::ElementPtr &sdf)
 {
   sdf::ElementPtr sdf_elem_controller = sdf->GetElement("controller");
   while (sdf_elem_controller != NULL)
@@ -120,7 +120,7 @@ void UserControlPlugin::ParseControllers(const sdf::ElementPtr &sdf)
   }
 }
 
-std::string UserControlPlugin::GetControllerType(const sdf::ElementPtr &sdf_elem_controller)
+std::string AvatarControlPlugin::GetControllerType(const sdf::ElementPtr &sdf_elem_controller)
 {
   std::string controller_type = "";
 
@@ -147,7 +147,7 @@ std::string UserControlPlugin::GetControllerType(const sdf::ElementPtr &sdf_elem
 //////////////////////////////////////// Controller construction //////////////////////////////////////////
 
 
-void UserControlPlugin::CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller)
+void AvatarControlPlugin::CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller)
 {
   sdf::ElementPtr step_height_elem = sdf_elem_controller->GetElement("step_height");
   if (step_height_elem != NULL)
@@ -164,18 +164,18 @@ void UserControlPlugin::CreateControllerModelPositionOnGround(const sdf::Element
   ROS_INFO("Added new positional controller (keep on ground) for model %s", model_->GetName().c_str());
 }
 
-void UserControlPlugin::CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller)
+void AvatarControlPlugin::CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller)
 {
   std::string topic_name = model_->GetName() + "/cmd_rot";
 
   // Add ROS topic for velocity control
   subscribers_model_rotation_.push_back(node_handle_.subscribe<geometry_msgs::Quaternion>(topic_name, 1,
-                                                            boost::bind(&UserControlPlugin::ModelRotationCB, this, _1)));
+                                                            boost::bind(&AvatarControlPlugin::ModelRotationCB, this, _1)));
 
   ROS_INFO("Added new rotation controller for model %s on topic %s", model_->GetName().c_str(), topic_name.c_str());
 }
 
-void UserControlPlugin::CreateControllerLinkVelocity(const sdf::ElementPtr &sdf_elem_controller)
+void AvatarControlPlugin::CreateControllerLinkVelocity(const sdf::ElementPtr &sdf_elem_controller)
 {
   sdf::ElementPtr link_name_elem = sdf_elem_controller->GetElement("link_name");
   std::string sdf_link_name = "";
@@ -210,20 +210,20 @@ void UserControlPlugin::CreateControllerLinkVelocity(const sdf::ElementPtr &sdf_
 
   // Add ROS topic for velocity control
   subscribers_link_velocity_.push_back(node_handle_.subscribe<geometry_msgs::Vector3>(topic_name, 1,
-                                                            boost::bind(&UserControlPlugin::LinkVelocityCB, this, _1, link)));
+                                                            boost::bind(&AvatarControlPlugin::LinkVelocityCB, this, _1, link)));
 
   ROS_INFO("Added new velocity controller for link %s on topic %s", link->GetName().c_str(), topic_name.c_str());
 }
 
 //////////////////////////////////////// ROS topic callback functions //////////////////////////////////////////
 
-void UserControlPlugin::ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg)
+void AvatarControlPlugin::ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg)
 {
   ROS_DEBUG("ModelRotationCB called! quaternion(xyzw) = %.2f %.2f %.2f %.2f", msg->x, msg->y, msg->z, msg->w);
   this->model_target_rotation_.Set(msg->w, msg->x, msg->y, msg->z);
 }
 
-void UserControlPlugin::LinkVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link)
+void AvatarControlPlugin::LinkVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link)
 {
   ROS_DEBUG("LinkVelocityCB called! link name = %s, link vel = %.2f %.2f %.2f ", link->GetName().c_str(), msg->x, msg->y, msg->z);
   gazebo::math::Vector3 velocity(msg->x, msg->y, msg->z);
@@ -231,7 +231,7 @@ void UserControlPlugin::LinkVelocityCB(const geometry_msgs::Vector3::ConstPtr &m
 }
 
 // Register this plugin with the simulator
-GZ_REGISTER_MODEL_PLUGIN(UserControlPlugin)
+GZ_REGISTER_MODEL_PLUGIN(AvatarControlPlugin)
 
 } // namespace gazebo
 

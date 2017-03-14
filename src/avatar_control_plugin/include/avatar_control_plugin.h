@@ -1,5 +1,5 @@
-#ifndef USER_CONTROLLER_PLUGIN_H
-#define USER_CONTROLLER_PLUGIN_H
+#ifndef AVATAR_CONTROL_PLUGIN_H
+#define AVATAR_CONTROL_PLUGIN_H
 
 #include <vector>
 #include <string>
@@ -24,13 +24,13 @@ namespace gazebo
 
 typedef std::map<std::string, physics::JointPtr> JointMap;
 
-class UserControlPlugin : public ModelPlugin
+class AvatarControlPlugin : public ModelPlugin
 {
 
 public:
 
-  UserControlPlugin();
-  ~UserControlPlugin();
+  AvatarControlPlugin();
+  ~AvatarControlPlugin();
 
   // Load the plugin and initilize all controllers
   void Load(physics::ModelPtr parent, sdf::ElementPtr sdf);

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>user_controller_plugin</name>
+  <name>avatar_control_plugin</name>
   <version>0.0.1</version>
   <description>A controller plugin package designed to allow users to control an avatar, etc. via topics</description>
 
