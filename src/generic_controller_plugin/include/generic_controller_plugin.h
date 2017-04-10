@@ -36,6 +36,7 @@
 
 #include <ros/ros.h>
 
+#include <algorithm>
 #include <mutex>
 
 namespace gazebo

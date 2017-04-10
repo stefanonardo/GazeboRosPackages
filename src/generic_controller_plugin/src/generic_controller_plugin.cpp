@@ -54,6 +54,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter)
   {
     physics::JointPtr joint = joint_iter->second;
+
     sdf::ElementPtr sdf_ctrl_def;
 
     // check, if controller for current joint was specified in the SDF and return sdf element pointer to controller
@@ -281,6 +282,7 @@ void GenericControlPlugin::createPositionController(const physics::JointPtr &joi
 {
   // generate joint topic name using the model name as prefix
   std::string topic_name = m_model->GetName() + "/" + joint->GetName() + "/cmd_pos";
+  replace(topic_name.begin(), topic_name.end(), ':', '_');
 
   // Add ROS topic for position control
   m_pos_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1,
@@ -336,4 +338,3 @@ void GenericControlPlugin::velocityCB(const std_msgs::Float64::ConstPtr &msg, co
 GZ_REGISTER_MODEL_PLUGIN(GenericControlPlugin)
 
 } // namespace gazebo
-
