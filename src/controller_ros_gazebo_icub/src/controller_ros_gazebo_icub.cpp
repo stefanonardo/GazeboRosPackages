@@ -241,8 +241,13 @@ namespace gazebo
       this->jointControl->Update();
       vector<string> joints_name;
 
+      gazebo::common::Time gazeboSimTime = this->model->GetWorld()->GetSimTime();
       sensor_msgs::JointState msg;
-      msg.header.stamp = ros::Time::now();
+      /* TODO: msg.header.seq should be populated too, ros::Time::now() automatically creates also a sequence number for the message
+         whereas this->model->GetWorld()->GetSimTime() does not. This is not a problem currently as we are never using that value, but
+         for the sake of completeness a way to add this value properly should be found. */
+      msg.header.stamp.sec = gazeboSimTime.sec;
+      msg.header.stamp.nsec = gazeboSimTime.nsec;
       for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
       {
         msg.name.push_back(it->second->GetName());
