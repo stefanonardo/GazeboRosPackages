@@ -43,6 +43,7 @@ find_package(catkin REQUIRED message_generation std_msgs)
 add_message_files(
    FILES
    CLEError.msg
+   ClientLoggerMessage.msg
    CSVRecordedFile.msg
    Device.msg
    ExperimentPopulationInfo.msg
