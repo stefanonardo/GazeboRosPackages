@@ -2496,6 +2496,15 @@ void GazeboRosApiPlugin::nrpAdvertiseServices() {
                                                           boost::bind(&GazeboRosApiPlugin::nrpWaitForRendering,this,_1,_2),
                                                           ros::VoidPtr(), &gazebo_queue_);
   nrp_wait_for_rendering_service_ = nh_->advertiseService(wait_for_rendering_aso);
+
+  // allow request of scene info
+  std::string request_scene_info_name("request_scene_info");
+  ros::AdvertiseServiceOptions request_scene_info_aso =
+    ros::AdvertiseServiceOptions::create<std_srvs::Empty>(
+                                                          request_scene_info_name,
+                                                          boost::bind(&GazeboRosApiPlugin::nrpRequestSceneInfo,this,_1,_2),
+                                                          ros::VoidPtr(), &gazebo_queue_);
+  nrp_request_scene_info_service_ = nh_->advertiseService(request_scene_info_aso);
 }
 
 bool GazeboRosApiPlugin::nrpAdvanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
@@ -2812,6 +2821,16 @@ bool GazeboRosApiPlugin::nrpWaitForRendering(std_srvs::Empty::Request &req,
 
   // Done waiting, everything has been loaded in the rendering environment. This will succeed even if
   // textures and things are missing.
+  return true;
+}
+
+bool GazeboRosApiPlugin::nrpRequestSceneInfo(std_srvs::Empty::Request &req,
+                                             std_srvs::Empty::Response &res)
+{
+  // right now we pipe the ROS service request through to gazebo
+  // expect the response on gazebo topic ~/response
+  //TODO: (maybe) publish on a dedicated ROS topic 
+  this->nrpPublishRequest("scene_info", "");
   return true;
 }
 
