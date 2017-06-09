@@ -1,3 +1,6 @@
 [submodule "src/gazebo_dvs_plugin"]
 	path = src/gazebo_dvs_plugin
 	url = https://github.com/HBPNeurorobotics/gazebo_dvs_plugin.git
+[submodule "src/gazebo_ros_retina_camera"]
+	path = src/gazebo_ros_retina_camera
+	url = https://github.com/HBPNeurorobotics/gazebo_ros_retina_camera.git
