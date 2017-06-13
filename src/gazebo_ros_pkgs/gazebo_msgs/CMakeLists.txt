@@ -24,6 +24,7 @@ add_message_files(
   WorldState.msg
 # NRP custom messages
   JointStates.msg
+  OpenSimPhysics.msg
   )
 
 add_service_files(DIRECTORY srv FILES

@@ -5,5 +5,6 @@ bool pause                         # true if physics engine is paused
 float64 max_update_rate            # throttle maximum physics update rate
 geometry_msgs/Vector3 gravity      # gravity vector (e.g. earth ~[0,0,-9.81])
 gazebo_msgs/ODEPhysics ode_config  # contains physics configurations pertaining to ODE
+gazebo_msgs/OpenSimPhysics opensim_config # contains physics configurations pertaining to OpenSim
 bool success                       # return true if set wrench successful
 string status_message              # comments if available
