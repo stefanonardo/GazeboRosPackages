@@ -33,6 +33,7 @@
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/JointState.h>
+#include <generic_controller_plugin/SetPIDParameters.h>
 
 #include <ros/ros.h>
 
@@ -43,6 +44,8 @@ namespace gazebo
 {
 
 typedef std::map<std::string, physics::JointPtr> JointMap;
+
+using namespace generic_controller_plugin;
 
 class GenericControlPlugin : public ModelPlugin
 {
@@ -86,6 +89,10 @@ private:
   // Generic velocity command callback function (ROS topic)
   void velocityCB(const std_msgs::Float64::ConstPtr &msg, const physics::JointPtr &joint);
 
+  // Generic PID parameter setter callback function (ROS service)
+  bool setPIDParametersCB(SetPIDParameters::Request &req,
+                          SetPIDParameters::Response &res);
+
   // ROS node handle
   ros::NodeHandle m_nh;
 
@@ -118,7 +125,8 @@ private:
   // ROS joint state publisher
   private: ros::Publisher m_joint_state_pub;
   private: sensor_msgs::JointState m_js;
-
+  // ROS joint controller parameter setter service
+  private: ros::ServiceServer m_setPIDParameterService;
 };
 
 } // namespace gazebo

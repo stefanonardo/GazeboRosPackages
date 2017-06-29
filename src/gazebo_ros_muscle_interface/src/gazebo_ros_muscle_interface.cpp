@@ -182,9 +182,6 @@ void MuscleInterfacePlugin::activationCB(const std_msgs::Float64::ConstPtr &msg,
   muscles[index]->SetActivationValue(msg->data);
 }
 
-// Register this plugin with the simulator
-GZ_REGISTER_MODEL_PLUGIN(MuscleInterfacePlugin)
-
 //////////////////////////////////////// ROS service callback functions //////////////////////////////////////////
 bool MuscleInterfacePlugin::getActivationsCB(
   GetMuscleActivations::Request &req,
@@ -250,4 +247,8 @@ bool MuscleInterfacePlugin::getMuscleStatesCB(
 }
 
 ////////////////////////////////////////
+
+// Register this plugin with the simulator
+GZ_REGISTER_MODEL_PLUGIN(MuscleInterfacePlugin)
+
 } // namespace gazebo

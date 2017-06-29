@@ -133,6 +133,12 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
   this->m_joint_state_pub = m_nh.advertise<sensor_msgs::JointState>( "joint_states", 10 );
 
+  m_setPIDParameterService = m_nh.advertiseService<
+    SetPIDParameters::Request,
+    SetPIDParameters::Response>(
+      m_model->GetName() + "/set_pid_parameters",
+      boost::bind(&GenericControlPlugin::setPIDParametersCB, this, _1, _2)
+  );
 }
 
 // Called by the world update start event
@@ -332,6 +338,35 @@ void GenericControlPlugin::velocityCB(const std_msgs::Float64::ConstPtr &msg, co
   double velocity_m_per_sec(msg->data);
   m_joint_controller->SetVelocityTarget(joint->GetScopedName(), velocity_m_per_sec);
   //pid.SetCmd(velocity_m_per_sec);
+}
+
+bool GenericControlPlugin::setPIDParametersCB(SetPIDParameters::Request &req,
+                                              SetPIDParameters::Response &res)
+{
+  std::string joint_name = req.joint;
+  double kp = req.kp,
+         ki = req.ki,
+         kd = req.kd;
+  ROS_DEBUG("setPIDParametersCB called! Joint name = %s, kp = %f, ki = %f, kd = %f", joint_name.c_str(), kp, ki, kd);
+
+  JointMap::iterator it = m_joints.find(joint_name);
+  if (it == m_joints.end())
+  {
+    res.success = false;
+    return false;
+  }
+  else
+  {
+    // We set same parameters for positin and velocity PID. That is because
+    // we do not know which kind of controller is used. At the time of this
+    // writing this just puts the parameters in a map of the controller manager.
+    // Parameters are obtained from there when the force is calculated.
+    const std::string joint_id = it->second->GetScopedName();
+    m_joint_controller->SetPositionPID(joint_id, common::PID(kp, ki, kd));
+    m_joint_controller->SetVelocityPID(joint_id, common::PID(kp, ki, kd));
+    res.success = true;
+    return true;
+  }
 }
 
 // Register this plugin with the simulator
