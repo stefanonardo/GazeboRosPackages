@@ -78,7 +78,8 @@ add_service_files(
    ResetSimulation.srv
    SetBrain.srv
    SetStructuredTransferFunction.srv
-   SetTransferFunction.srv
+   AddTransferFunction.srv
+   EditTransferFunction.srv
    Trigger.srv
    ExtendTimeout.srv
 )
