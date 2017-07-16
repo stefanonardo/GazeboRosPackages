@@ -82,6 +82,7 @@ add_service_files(
    EditTransferFunction.srv
    Trigger.srv
    ExtendTimeout.srv
+   SimulationRecorder.srv
 )
 
 ## Generate actions in the 'action' folder
