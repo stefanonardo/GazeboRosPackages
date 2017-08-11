@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   gazebo_msgs
   std_srvs
+  cle_ros_msgs
 )
 
 # Depend on system install of Gazebo
@@ -32,12 +33,14 @@ find_package(Boost REQUIRED COMPONENTS filesystem)
 catkin_package(
   LIBRARIES
   gazebo_ros_recording_plugin
+  gazebo_ros_playback_plugin
 
   CATKIN_DEPENDS
   roscpp
   rosbag
   gazebo_msgs
   std_srvs
+  cle_ros_msgs
 )
 
 include_directories(include
@@ -70,7 +73,13 @@ set_target_properties(gazebo_ros_recording_plugin PROPERTIES LINK_FLAGS "${ld_fl
 set_target_properties(gazebo_ros_recording_plugin PROPERTIES COMPILE_FLAGS "${cxx_flags}")
 target_link_libraries(gazebo_ros_recording_plugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
+add_library(gazebo_ros_playback_plugin src/gazebo_ros_playback_plugin.cpp src/rosbag/player.cpp)
+add_dependencies(gazebo_ros_playback_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+set_target_properties(gazebo_ros_playback_plugin PROPERTIES LINK_FLAGS "${ld_flags}")
+set_target_properties(gazebo_ros_playback_plugin PROPERTIES COMPILE_FLAGS "${cxx_flags}")
+target_link_libraries(gazebo_ros_playback_plugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
 # Install Gazebo System Plugins
-install(TARGETS gazebo_ros_recording_plugin
+install(TARGETS gazebo_ros_recording_plugin gazebo_ros_playback_plugin
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )

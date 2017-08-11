@@ -20,11 +20,13 @@
   <build_depend>gazebo</build_depend>
   <build_depend>gazebo_msgs</build_depend>
   <build_depend>std_srvs</build_depend>
+  <build_depend>cle_ros_msgs</build_depend>
   <run_depend>catkin</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>rosbag</run_depend>
   <run_depend>gazebo</run_depend>
   <run_depend>gazebo_msgs</run_depend>
   <run_depend>std_srvs</run_depend>
+  <run_depend>cle_ros_msgs</run_depend>
 
 </package>

@@ -5,4 +5,5 @@ string reservation                # name of a reservation on the vizcluster, e.g
 int32 brain_processes             # number of brain processes (overrides experiment configuration)
 int32 sim_id                      # simulation ID
 string timeout                    # a date time when the simulation will timeout
+string playback_path              # path to simulation recording to play (if any)
 ---

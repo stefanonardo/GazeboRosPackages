@@ -2,6 +2,7 @@
 #define __GAZEBO_ROS_REPLAY_PLUGIN_HH__
 
 #include <gazebo/common/common.hh>
+#include <gazebo/physics/physics.hh>
 #include <gazebo/transport/transport.hh>
 
 #include <ros/ros.h>
@@ -21,11 +22,6 @@ public:
   virtual ~GazeboRosReplayPlugin()
   {
     // disconnect all listener events
-    if (this->_timeResetConnection)
-    {
-      event::Events::DisconnectTimeReset(this->_timeResetConnection);
-      this->_timeResetConnection.reset();
-    }
     if (this->_gazeboLoadedConnection)
     {
       event::Events::DisconnectWorldCreated(this->_gazeboLoadedConnection);
@@ -67,13 +63,9 @@ public:
     this->_gz_nh.reset(new transport::Node());
     this->_gz_nh->Init(world_name);
 
-    // listen for simulation time reset events
-    auto reset_cb = std::bind(&GazeboRosReplayPlugin::onReset, this);
-    this->_timeResetConnection = event::Events::ConnectTimeReset(reset_cb);
+    // store a reference to the gazebo world
+    this->_world = gazebo::physics::get_world(world_name);
   }
-
-  /// \brief Handle simulation time (full) reset event, implementation specific.
-  virtual void onReset() = 0;
 
 protected:
 
@@ -86,6 +78,9 @@ protected:
   /// \brief Gazebo NodeHandle
   gazebo::transport::NodePtr _gz_nh;
 
+  /// \brief Interface to the Gazebo world.
+  gazebo::physics::WorldPtr _world;
+
   /// \brief Mutex to protect concurrent access while allocating/releasing.
   boost::recursive_mutex _mutex;
 
@@ -93,9 +88,6 @@ private:
 
   /// \brief Notification that Gazebo has been loaded.
   event::ConnectionPtr _gazeboLoadedConnection;
-
-  /// \brief Simulation time reset handler.
-  event::ConnectionPtr _timeResetConnection;
 
 }; // class GazeboRosReplayPlugin
 

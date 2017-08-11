@@ -1,8 +1,6 @@
 #ifndef __GAZEBO_ROS_RECORDING_PLUGIN_HH__
 #define __GAZEBO_ROS_RECORDING_PLUGIN_HH__
 
-#include <gazebo/physics/physics.hh>
-
 #include <rosbag/recorder.h>
 
 #include <boost/filesystem.hpp>
@@ -22,6 +20,17 @@ public:
   /// \brief Constructor
   GazeboRosRecordingPlugin() : _isRecording(false),
                                _recordCount(0) {};
+
+  /// \brief Destructor
+  virtual ~GazeboRosRecordingPlugin()
+  {
+    // disconnect time reset listener events
+    if (this->_timeResetConnection)
+    {
+      event::Events::DisconnectTimeReset(this->_timeResetConnection);
+      this->_timeResetConnection.reset();
+    }
+  }
 
   /// \brief Initialize ROS services and schedule Gazebo service init.
   virtual void Init();
@@ -83,8 +92,8 @@ private:
   /// \brief Service to handle a state request.
   ros::ServiceServer _stateService;
 
-  /// \brief Interface to the Gazebo world.
-  gazebo::physics::WorldPtr _world;
+  /// \brief Simulation time reset handler.
+  event::ConnectionPtr _timeResetConnection;
 
   /// \brief Gazebo publisher to logging interface.
   gazebo::transport::PublisherPtr _logControlPublisher;
