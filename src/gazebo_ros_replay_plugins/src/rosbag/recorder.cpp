@@ -539,8 +539,17 @@ void Recorder::doRecord() {
         if (scheduledCheckDisk() && checkLogging())
             bag_.write(out.topic, out.time, *out.msg, out.connection_header);
 
-				if (!running_) // NRP: added check for running_ flag
-						break;
+        if (!running_) { // NRP: added check for running_ flag
+            boost::unique_lock<boost::mutex> lock(queue_mutex_);
+            while (!queue_->empty()) {
+                out = queue_->front();
+                queue_->pop();
+                queue_size_ -= out.msg->size();
+                bag_.write(out.topic, out.time, *out.msg, out.connection_header);
+            }
+            lock.release()->unlock();
+            break;
+        }
     }
 
     stopWriting();

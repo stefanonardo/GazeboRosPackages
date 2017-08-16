@@ -83,6 +83,7 @@ add_service_files(
    Trigger.srv
    ExtendTimeout.srv
    SimulationRecorder.srv
+   SimulationPlayback.srv
 )
 
 ## Generate actions in the 'action' folder

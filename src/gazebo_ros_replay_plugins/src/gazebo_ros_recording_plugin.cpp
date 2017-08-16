@@ -38,8 +38,9 @@ void GazeboRosRecordingPlugin::onGazeboLoaded(std::string world_name)
   // parent base setup
   GazeboRosReplayPlugin::onGazeboLoaded(world_name);
 
-  // retrieve the world reference
-  this->_world = gazebo::physics::get_world(world_name);
+  // listen for simulation time reset events
+  auto reset_cb = std::bind(&GazeboRosRecordingPlugin::onReset, this);
+  this->_timeResetConnection = event::Events::ConnectTimeReset(reset_cb);
 
   // Gazebo publisher for controlling logging
   this->_logControlPublisher = this->_gz_nh->Advertise<gazebo::msgs::LogControl>("~/log/control");
@@ -96,6 +97,8 @@ bool GazeboRosRecordingPlugin::onStart(std_srvs::Trigger::Request &req,
     opts.compression = rosbag::compression::BZ2;
     opts.path = rosbag_dir;
     opts.prefix = count_str;
+    opts.do_exclude = true;
+    opts.exclude_regex = "/gazebo/(.*)|/clock|/ros_cle_simulation/(.*)|/rosout(.*)|";
 
     // start the ROS recorder loop in a thread as it is blocking
     this->_rosbagPtr.reset(new rosbag::Recorder(opts));
