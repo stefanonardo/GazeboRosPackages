@@ -558,13 +558,13 @@ void Player::doPublish(MessageInstance const& m) {
                 if (paused_)
                 {
                     printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    time_publisher_.runStalledClock(ros::WallDuration(.001)); // NRP: reduced sleep
                     ros::spinOnce();
                 }
                 else if (delayed_)
                 {
                     printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
+                    time_publisher_.runStalledClock(ros::WallDuration(.001)); // NRP: reduced sleep
                     ros::spinOnce();
                     // You need to check the rate here too.
                     if(rate_control_sub_ == NULL || (time_publisher_.getTime() - last_rate_control_).toSec() <= options_.rate_control_max_delay) {
@@ -585,7 +585,7 @@ void Player::doPublish(MessageInstance const& m) {
         }
 
         printTime();
-        time_publisher_.runClock(ros::WallDuration(.1));
+        time_publisher_.runClock(ros::WallDuration(.001)); // NRP: reduced sleep
         ros::spinOnce();
     }
 

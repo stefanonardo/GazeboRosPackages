@@ -4,6 +4,12 @@ issues that could cause us to rewrite it, but it works for now.
 
 Changelog:
 
+2017.22.08
+- do not record topics published by Gazebo/plugins by default
+- support white listing specific topic types from Gazebo (generalizable)
+- support rate limiting/downsampling recording of topics published by Gazebo
+- reduced sleep while paused for more responsive playback resume
+
 2017.10.08
 - added playback state to mark completion of loop or gracefully exit playback
 - disabled terminal input/output during rosbag playback

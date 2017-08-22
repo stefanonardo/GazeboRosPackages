@@ -50,6 +50,7 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/regex.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <ros/ros.h>
 #include <ros/time.h>
@@ -113,6 +114,12 @@ struct ROSBAG_DECL RecorderOptions
     std::string min_space_str;
 
     std::vector<std::string> topics;
+
+    // NRP: allowable list of types published by gazebo, others are ignored
+    std::vector<std::string> gazebo_type_whitelist;
+
+    // NRP: rate limit for recording gazebo generated topics (in seconds)
+    ros::Duration gazebo_rate_limit;
 };
 
 class ROSBAG_DECL Recorder
@@ -191,6 +198,9 @@ private:
 
     bool                          running_;
 		std::vector<boost::shared_ptr<ros::Subscriber>> subscribers_;
+
+    // NRP: for gazebo based topics, track recording time for rate limiting
+    boost::unordered_map<std::string, ros::Time> gazebo_topics_;
 };
 
 } // namespace rosbag

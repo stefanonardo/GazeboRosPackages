@@ -98,7 +98,15 @@ bool GazeboRosRecordingPlugin::onStart(std_srvs::Trigger::Request &req,
     opts.path = rosbag_dir;
     opts.prefix = count_str;
     opts.do_exclude = true;
-    opts.exclude_regex = "/gazebo/(.*)|/clock|/ros_cle_simulation/(.*)|/rosout(.*)|";
+
+    // ignore ROS/CLE lifecycle and error publishers, whitelist logs for pop up messages
+    opts.exclude_regex = "/ros_cle_simulation/(?!logs).*|/rosout(.*)";
+
+    // allowable gazebo types, all others published by Gazebo or its plugins are ignored
+    opts.gazebo_type_whitelist.push_back("sensor_msgs/JointState");
+
+    // the rate at which gazebo topics will be recorded (in seconds)
+    opts.gazebo_rate_limit = ros::Duration(1.0 / float(GZ_NRP_LOG_RECORD_RATE));
 
     // start the ROS recorder loop in a thread as it is blocking
     this->_rosbagPtr.reset(new rosbag::Recorder(opts));

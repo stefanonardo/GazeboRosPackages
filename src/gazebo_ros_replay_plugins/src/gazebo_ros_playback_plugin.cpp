@@ -206,14 +206,17 @@ void GazeboRosPlaybackPlugin::playback()
   while(!this->_recordingDir.empty())
   {
 
+    // match our time increment to the Gazebo log recording rate
+    gazebo::common::Time dt = gazebo::common::Time(1, 0) / GZ_NRP_LOG_RECORD_RATE;
+
+    // realtime playback rate in milliseconds based on the recording rate
+    int dt_ms = floor(dt.Double() * 1000);
+
     // while playing, process ROS and gazbeo synchronized playback
     while(this->_isPlaying)
     {
-      // advance gazebo to the next frame closes to target time, skip in between
-      // frames for performance
-      gazebo::common::Time sim_time = this->_world->GetSimTime();
-      gazebo::common::Time target(sim_time.sec, sim_time.nsec + 20 * pow(10, 7));
-      gazebo::util::LogPlay::Instance()->Seek(target);
+      // next target time is the current sim time plus the recording rate increment
+      gazebo::common::Time target = this->_world->GetSimTime() + dt;
 
       // run the ros and gzserver updates in parallel
       auto rosbag_run = boost::bind(&rosbag::Player::runFor, this->_rosbagPtr, target.sec, target.nsec);
@@ -221,7 +224,10 @@ void GazeboRosPlaybackPlugin::playback()
       boost::thread rosbag_thread(rosbag_run);
       boost::thread gz_thread(gz_run);
 
-      // wait for both to return
+      // sleep to ensure realtime, this can be mosified in the future to support faster/slower playback
+      boost::this_thread::sleep(boost::posix_time::milliseconds(dt_ms));
+
+      // wait for the log players to return
       rosbag_thread.join();
       gz_thread.join();
 
@@ -309,6 +315,12 @@ bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index, bool initialize)
 
 void GazeboRosPlaybackPlugin::removeSDFPlugins(sdf::ElementPtr elem)
 {
+  // Allow sensor plugins to playback the simulation state as this saves a lot
+  // of space in the rosbag (e.g. images will be deterministically produced by
+  // Gazebo, so we don't need to save them in the rosbag).
+  if(elem->GetName() == "sensor")
+    return;
+
   // SDF API is a bit strange, trying to use GetElement can result in insertion
   // so take the performance hit and check with HasElement first
   while(elem->HasElement("plugin"))

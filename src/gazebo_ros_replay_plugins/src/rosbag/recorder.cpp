@@ -294,7 +294,20 @@ std::string Recorder::timeToStr(T ros_t)
 void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event, string const& topic, shared_ptr<ros::Subscriber> subscriber, shared_ptr<int> count) {
     //void Recorder::doQueue(topic_tools::ShapeShifter::ConstPtr msg, string const& topic, shared_ptr<ros::Subscriber> subscriber, shared_ptr<int> count) {
     Time rectime = Time::now();
-    
+
+    // NRP: rate limit gazebo topics according to options, drop messages from the faster control loop
+    // to our desired rate
+    if(gazebo_topics_.find(subscriber->getTopic()) != gazebo_topics_.end()) {
+
+      // if not enough time has elapsed, discard the message
+      ros::Duration delta = rectime - gazebo_topics_[subscriber->getTopic()];
+      if(delta < options_.gazebo_rate_limit)
+        return;
+
+      // otherwise, mark this message as received for the next rate limit
+      gazebo_topics_[subscriber->getTopic()] = rectime;
+    }
+
     if (options_.verbose)
         cout << "Received message on topic " << subscriber->getTopic() << endl;
 
@@ -596,14 +609,65 @@ void Recorder::doRecordSnapshotter() {
 void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_handle) {
     (void)e;
     (void)node_handle;
-    ros::master::V_TopicInfo topics;
-    if (ros::master::getTopics(topics)) {
-                foreach(ros::master::TopicInfo const& t, topics) {
-                        if (shouldSubscribeToTopic(t.name))
-                                subscribe(t.name);
-                }
+
+
+    // NRP: don't subscribe to any Gazebo published topics from camera/sensor plugins as
+    // they will be published during playback by Gazebo and this will reduce the bag size
+    // this code is slightly modified from below to specifically check the /gazebo node and
+    // only subscribe to things that are not in its list
+    XmlRpc::XmlRpcValue req;
+    req[0] = ros::this_node::getName();
+    req[1] = "/gazebo";
+    XmlRpc::XmlRpcValue resp;
+    XmlRpc::XmlRpcValue payload;
+
+    if (ros::master::execute("lookupNode", req, resp, payload, true))
+    {
+      std::string peer_host;
+      uint32_t peer_port;
+
+      if (!ros::network::splitURI(static_cast<std::string>(resp[2]), peer_host, peer_port))
+      {
+        ROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
+      } else {
+
+        XmlRpc::XmlRpcClient c(peer_host.c_str(), peer_port, "/");
+        XmlRpc::XmlRpcValue req2;
+        XmlRpc::XmlRpcValue resp2;
+        req2[0] = ros::this_node::getName();
+        c.execute("getPublications", req2, resp2);
+
+        if (!c.isFault() && resp2.valid() && resp2.size() > 0 && static_cast<int>(resp2[0]) == 1)
+        {
+
+            for(int i = 0; i < resp2[2].size(); i++)
+              gazebo_topics_[resp2[2][i][0]] = ros::Time(0);
+
+          // NRP: moved from below, only subscribe to non-gazebo messages or gazebo message of explicitly
+          // whitelisted types
+          ros::master::V_TopicInfo topics;
+          if (ros::master::getTopics(topics)) {
+            foreach(ros::master::TopicInfo const& t, topics) {
+
+              // check if this is a gazebo topic first, if it is check if the type is whitelisted or continue
+              if((gazebo_topics_.find(t.name) != gazebo_topics_.end()) &&
+                 (std::find(options_.gazebo_type_whitelist.begin(),
+                            options_.gazebo_type_whitelist.end(),
+                            t.datatype) == options_.gazebo_type_whitelist.end()))
+                 continue;
+
+              // normal subscribe check
+              if (shouldSubscribeToTopic(t.name))
+                subscribe(t.name);
+            }
+          }
+
+        } else {
+          ROS_ERROR("Node at: [%s] failed to return subscriptions.", static_cast<std::string>(resp[2]).c_str());
+        }
+      }
     }
-    
+
     if (options_.node != std::string(""))
     {
 
