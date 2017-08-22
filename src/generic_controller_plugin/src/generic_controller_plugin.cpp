@@ -143,6 +143,15 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
     SetPIDParameters::Response>(
       m_model->GetName() + "/set_pid_parameters",
       boost::bind(&GenericControlPlugin::setPIDParametersCB, this, _1, _2)
+      
+  );
+    
+  m_jointPropertiesService = m_nh.advertiseService<
+    JointProperties::Request,
+    JointProperties::Response>(
+      m_model->GetName() + "/joint_properties",
+      boost::bind(&GenericControlPlugin::getJointPropertiesCB, this, _1, _2)
+      
   );
 }
 
@@ -374,6 +383,28 @@ bool GenericControlPlugin::setPIDParametersCB(SetPIDParameters::Request &req,
   }
 }
 
+bool GenericControlPlugin::getJointPropertiesCB(JointProperties::Request &req,
+                             JointProperties::Response &res)
+{
+  if (m_joints.size() > 0)
+  {
+    res.joint.resize(m_joints.size());
+    res.lower_limit.resize(m_joints.size());
+    res.upper_limit.resize(m_joints.size());
+    int jointIdx = 0;
+    for (JointMap::iterator joint_iter = m_joints.begin(); joint_iter != m_joints.end(); ++joint_iter)
+    {
+        physics::JointPtr joint = joint_iter->second;
+        res.joint[jointIdx] = joint->GetName();
+        
+        // This only gives you the limits of the first joint axis/degree of freedom!
+        res.lower_limit[jointIdx] = joint->GetLowerLimit(0).Radian();
+        res.upper_limit[jointIdx] = joint->GetUpperLimit(0).Radian();
+        jointIdx++;
+    }
+  }
+  return true;
+}
 // Register this plugin with the simulator
 GZ_REGISTER_MODEL_PLUGIN(GenericControlPlugin)
 

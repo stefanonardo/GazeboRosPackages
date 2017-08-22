@@ -48,6 +48,7 @@ find_package(OGRE)
 add_service_files(
   FILES
   SetPIDParameters.srv
+  JointProperties.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

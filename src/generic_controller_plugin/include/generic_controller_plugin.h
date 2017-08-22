@@ -39,6 +39,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/JointState.h>
 #include <generic_controller_plugin/SetPIDParameters.h>
+#include <generic_controller_plugin/JointProperties.h>
 
 #include <ros/ros.h>
 
@@ -97,6 +98,10 @@ private:
   // Generic PID parameter setter callback function (ROS service)
   bool setPIDParametersCB(SetPIDParameters::Request &req,
                           SetPIDParameters::Response &res);
+  
+  // Joint properties getter callback function (ROS service)
+  bool getJointPropertiesCB(JointProperties::Request &req,
+                             JointProperties::Response &res);
 
   // ROS node handle
   ros::NodeHandle m_nh;
@@ -132,6 +137,9 @@ private:
   private: sensor_msgs::JointState m_js;
   // ROS joint controller parameter setter service
   private: ros::ServiceServer m_setPIDParameterService;
+  
+  // ROS joint properties getter service (joint names, lower/upper limits)
+  private: ros::ServiceServer m_jointPropertiesService;
 };
 
 } // namespace gazebo
