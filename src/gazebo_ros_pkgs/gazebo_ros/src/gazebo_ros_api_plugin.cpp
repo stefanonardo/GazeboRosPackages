@@ -2700,6 +2700,13 @@ if (!nrpGetVisualFromWorld(req.model_name, req.link_name, req.visual_name, visua
 
   nrpCleanModelMsg(modelMsg);
   //std::cout << modelMsg.DebugString() << std::endl;
+
+  // Notify the NRP recording plugin of a material change, use a custom topic to avoid triggering
+  // the recorder update with every normal ~/model/modify event.
+  gazebo::transport::PublisherPtr recorder_pub =
+    gazebonode_->Advertise<gazebo::msgs::Model>("~/recording/model/modify");
+  recorder_pub->Publish(modelMsg);
+
   // Create a publisher on the ~/model/modify topic
   gazebo::transport::PublisherPtr model_pub =
     gazebonode_->Advertise<gazebo::msgs::Model>("~/model/modify");
@@ -2816,6 +2823,10 @@ bool GazeboRosApiPlugin::nrpSetLightProperties(gazebo_msgs::SetLightProperties::
     light.set_attenuation_constant(req.attenuation_constant);
     light.set_attenuation_linear(req.attenuation_linear);
     light.set_attenuation_quadratic(req.attenuation_quadratic);
+
+    // Notify the NRP recording plugin of a light change, use a custom topic to avoid triggering
+    // the recorder update with every normal ~/light/modify event.
+    gazebonode_->Advertise<gazebo::msgs::Light>("~/recording/light/modify")->Publish(light, true);
 
     gazebonode_->Advertise<gazebo::msgs::Light>("~/light/modify")->Publish(light, true);
 

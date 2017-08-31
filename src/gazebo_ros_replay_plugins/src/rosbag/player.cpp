@@ -128,8 +128,8 @@ Player::~Player() {
 // NRP: mechanism to stop playback in the middle of a bag
 void Player::shutdown() {
   boost::mutex::scoped_lock lock(this->_shutdown_mutex);
-	if(node_handle_.ok())
-		node_handle_.shutdown();
+  if(node_handle_.ok())
+    node_handle_.shutdown();
 }
 
 void Player::publish() {
@@ -194,7 +194,7 @@ void Player::publish() {
     if (view.size() == 0)
     {
       std::cerr << "No messages to play on specified topics.  Exiting." << std::endl;
-      // NRP: not needed in NRP ros::shutdown();
+      node_handle_.shutdown(); // NRP: changed from ros::shutdown
       return;
     }
 
@@ -308,19 +308,24 @@ void Player::publish() {
 void Player::runFor(const int &sec, const int& nsec)
 {
   // playback /clock time to run to
-  ros::Time end_time(sec, nsec);
+  ros::Time limit_time(sec, nsec);
+
+  // lock the limit and set it to block publish loop
+  {
+    boost::mutex::scoped_lock lock(this->_limit_mutex);
+    time_publisher_.setLimitTime(limit_time);
+
+    // flush any blocking messages
+    time_publisher_.setWCHorizon(ros::WallTime(0, 0));
+  }
 
   // unpause and run until time, then pause again
   requested_pause_state_ = false;
   pause_change_requested_ = true;
-  while((time_publisher_.getMessageTime() < end_time) && node_handle_.ok()) {
-    time_publisher_.setWCHorizon(ros::WallTime::now());
-    //boost::this_thread::sleep(boost::posix_time::milliseconds(0.1));
-  }
 
-  // pause until next run loop
-  requested_pause_state_ = true;
-  pause_change_requested_ = true;
+  // wait for the message to pass the queue limit
+  while((time_publisher_.getTime() < limit_time) && node_handle_.ok())
+    boost::this_thread::sleep(boost::posix_time::milliseconds(0.001));
 }
 
 void Player::updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
@@ -443,9 +448,6 @@ void Player::doPublish(MessageInstance const& m) {
     ros::Time const& time = m.getTime();
     string callerid       = m.getCallerId();
 
-    // NRP: save the raw /clock message time for coordination
-    time_publisher_.setMessageTime(m.getTime());
-
     ros::Time translated = time_translator_.translate(time);
     ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
 
@@ -453,6 +455,17 @@ void Player::doPublish(MessageInstance const& m) {
     time_publisher_.setTime(time);
     time_publisher_.setHorizon(time);
     time_publisher_.setWCHorizon(horizon);
+
+    // NRP: check if we are past the time limit, if so request a pause
+    {
+      boost::mutex::scoped_lock lock(this->_limit_mutex);
+      if(time_publisher_.getLimitTime() < time)
+      {
+        // pause until next run loop
+        requested_pause_state_ = true;
+        pause_change_requested_ = true;
+      }
+    }
 
     string callerid_topic = callerid + topic;
 
@@ -465,9 +478,9 @@ void Player::doPublish(MessageInstance const& m) {
     // If immediate specified, play immediately
     if (options_.at_once) {
         time_publisher_.stepClock();
-				// NRP: support shutting down from external call
-				if(node_handle_.ok())
-        		pub_iter->second.publish(m);
+        // NRP: support shutting down from external call
+        if(node_handle_.ok())
+            pub_iter->second.publish(m);
         printTime();
         return;
     }
@@ -481,9 +494,9 @@ void Player::doPublish(MessageInstance const& m) {
       time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
       horizon += shift;
       time_publisher_.setWCHorizon(horizon);
-			// NRP: support shutting down from external call
-			if(node_handle_.ok())
-      		(pub_iter->second).publish(m);
+      // NRP: support shutting down from external call
+      if(node_handle_.ok())
+          (pub_iter->second).publish(m);
       printTime();
       return;
     }
@@ -540,12 +553,12 @@ void Player::doPublish(MessageInstance const& m) {
                     horizon += shift;
                     time_publisher_.setWCHorizon(horizon);
 
-    								// NRP: support shutting down from external call
-										{
-											boost::mutex::scoped_lock lock(this->_shutdown_mutex);
-											if(node_handle_.ok())
-                    			(pub_iter->second).publish(m);
-										}
+                    // NRP: support shutting down from external call
+                    {
+                      boost::mutex::scoped_lock lock(this->_shutdown_mutex);
+                      if(node_handle_.ok())
+                          (pub_iter->second).publish(m);
+                    }
 
                     printTime();
                     return;
@@ -590,11 +603,11 @@ void Player::doPublish(MessageInstance const& m) {
     }
 
     // NRP: support shutting down from external call
-		{
-			boost::mutex::scoped_lock lock(this->_shutdown_mutex);
-			if(node_handle_.ok())
-    			pub_iter->second.publish(m);
-		}
+    {
+      boost::mutex::scoped_lock lock(this->_shutdown_mutex);
+      if(node_handle_.ok())
+          pub_iter->second.publish(m);
+    }
 }
 
 
@@ -795,14 +808,14 @@ ros::Time const& TimePublisher::getTime() const
     return current_;
 }
 
-void TimePublisher::setMessageTime(const ros::Time& time)
+void TimePublisher::setLimitTime(const ros::Time& time)
 {
-    current_ = time;
+    limit_ = time;
 }
 
-ros::Time const& TimePublisher::getMessageTime() const
+ros::Time const& TimePublisher::getLimitTime() const
 {
-    return current_;
+    return limit_;
 }
 
 void TimePublisher::runClock(const ros::WallDuration& duration)
@@ -829,7 +842,7 @@ void TimePublisher::runClock(const ros::WallDuration& duration)
             if (t >= next_pub_)
             {
                 pub_msg.clock = current_;
-  							// NRP: gazebo published clock
+                // NRP: gazebo published clock
                 // time_pub_.publish(pub_msg);
                 next_pub_ = t + wall_step_;
             }
@@ -876,7 +889,7 @@ void TimePublisher::stepClock()
         rosgraph_msgs::Clock pub_msg;
 
         pub_msg.clock = current_;
-  			// NRP: gazebo published clock
+        // NRP: gazebo published clock
         // time_pub_.publish(pub_msg);
 
         ros::WallTime t = ros::WallTime::now();
@@ -900,7 +913,7 @@ void TimePublisher::runStalledClock(const ros::WallDuration& duration)
             if (t > next_pub_)
             {
                 pub_msg.clock = current_;
-  							// NRP: gazebo published clock
+                // NRP: gazebo published clock
                 // time_pub_.publish(pub_msg);
                 next_pub_ = t + wall_step_;
             }

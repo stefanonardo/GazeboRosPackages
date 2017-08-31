@@ -44,6 +44,18 @@ void GazeboRosRecordingPlugin::onGazeboLoaded(std::string world_name)
 
   // Gazebo publisher for controlling logging
   this->_logControlPublisher = this->_gz_nh->Advertise<gazebo::msgs::LogControl>("~/log/control");
+
+  // thread to handle change subscriptions below
+  auto changes_run = boost::bind(&GazeboRosRecordingPlugin::processChanges, this);
+  this->_changeThreadPtr.reset(new boost::thread(changes_run));
+
+  // Gazebo subscribers for user light and material changes
+  this->_materialSubscriber = this->_gz_nh->Subscribe("~/recording/model/modify",
+                                                      &GazeboRosRecordingPlugin::onModelChange,
+                                                      this);
+  this->_lightSubscriber = this->_gz_nh->Subscribe("~/recording/light/modify",
+                                                   &GazeboRosRecordingPlugin::onLightChange,
+                                                   this);
 }
 
 bool GazeboRosRecordingPlugin::onStart(std_srvs::Trigger::Request &req,
@@ -63,6 +75,16 @@ bool GazeboRosRecordingPlugin::onStart(std_srvs::Trigger::Request &req,
   // pause the world to start both recorders at the same time
   bool is_paused = this->_world->IsPaused();
   this->_world->SetPaused(true);
+
+  // before starting, make sure the light SDF is up to date, this is not done
+  // automatically even as visuals are updated
+  for(auto light : this->_world->Lights())
+  {
+    gazebo::msgs::Light msg;
+    light->FillMsg(msg);
+    light->UpdateParameters(gazebo::msgs::LightToSDF(msg));
+  }
+  this->_world->UpdateStateSDF();
 
   // catch any filesystem issues (significant failure) and notify caller
   try
@@ -154,9 +176,7 @@ bool GazeboRosRecordingPlugin::onStop(std_srvs::Trigger::Request &req,
   this->_rosbagPtr.reset();
 
   // stop gzserver recording
-  gazebo::msgs::LogControl msg;
-  msg.set_stop(true);
-  this->_logControlPublisher->Publish<gazebo::msgs::LogControl>(msg, true);
+  gazebo::util::LogRecord::Instance()->Stop();
 
   // since we haven't patched Gazebo recording, make the generated path more logical
   // move from the nested <num>/<date>/gzserver/state.log to just <num>.log
@@ -286,6 +306,228 @@ bool GazeboRosRecordingPlugin::isRecording(std_srvs::Trigger::Request &req,
   res.success = this->_isRecording;
 
   return true;
+}
+
+void GazeboRosRecordingPlugin::onModelChange(const boost::shared_ptr<gazebo::msgs::Model const> &msg)
+{
+  // guard instance / state variables
+  boost::unique_lock<boost::recursive_mutex> lock(this->_mutex);
+
+  // if not recording, ignore the material change
+  if(!this->_isRecording)
+    return;
+
+  // spawn a thread to wait for the result, we can't block here since Gazebo will be blocked
+  boost::unique_lock<boost::recursive_mutex> clock(this->_changeMutex);
+  auto wait_run = boost::bind(&GazeboRosRecordingPlugin::waitForChange, this, msg, nullptr);
+  boost::shared_ptr<boost::thread> threadPtr;
+  threadPtr.reset(new boost::thread(wait_run));
+  this->_changeThreads.push(std::make_pair(this->_world->GetSimTime(), threadPtr));
+}
+
+void GazeboRosRecordingPlugin::onLightChange(const boost::shared_ptr<gazebo::msgs::Light const> &msg)
+{
+  // guard instance / state variables
+  boost::unique_lock<boost::recursive_mutex> lock(this->_mutex);
+
+  // if not recording, ignore the light change
+  if(!this->_isRecording)
+    return;
+
+  // spawn a thread to wait for the result, we can't block here since Gazebo will be blocked
+  boost::unique_lock<boost::recursive_mutex> clock(this->_changeMutex);
+  auto wait_run = boost::bind(&GazeboRosRecordingPlugin::waitForChange, this, nullptr, msg);
+  boost::shared_ptr<boost::thread> threadPtr;
+  threadPtr.reset(new boost::thread(wait_run));
+  this->_changeThreads.push(std::make_pair(this->_world->GetSimTime(), threadPtr));
+}
+
+void GazeboRosRecordingPlugin::processChanges()
+{
+  // run in the background until Gazebo is terminated
+  while(this->_nh->ok())
+  {
+    // idle wait while no changes to process
+    bool empty = true;
+    while(empty)
+    {
+      boost::this_thread::sleep(boost::posix_time::milliseconds(50));
+      {
+        boost::unique_lock<boost::recursive_mutex> lock(this->_changeMutex);
+        empty = _changeThreads.empty();
+      }
+    }
+
+    // compute a time window to wait for messages (250 miliseconds)
+    gazebo::common::Time end(0, 250 * 1e6);
+    {
+       boost::unique_lock<boost::recursive_mutex> lock(this->_changeMutex);
+       end += _changeThreads.front().first;
+    }
+
+    // process the queue and wait until we hit the window
+    bool ok = true;
+    empty = false;
+    while(ok)
+    {
+      std::pair<gazebo::common::Time, boost::shared_ptr<boost::thread>> current;
+      {
+        // check that the queue has items to process
+        boost::unique_lock<boost::recursive_mutex> lock(this->_changeMutex);
+        empty = _changeThreads.empty();
+        if(!empty)
+        {
+          // check that we want to process the next item
+          current = _changeThreads.front();
+          if(current.first > end)
+          {
+            ok = false;
+            break;
+          }
+
+          // remove the first item
+          _changeThreads.pop();
+        }
+      }
+
+      // if empty, wait for more events until the timeout window expires
+      if(empty)
+      {
+        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+        ok = this->_world->GetSimTime() < end;
+      }
+
+      // otherwise, wait for the thread to complete (this won't hang as it is limited in the thread)
+      else
+        current.second->join();
+    }
+
+    // toggle recording to save the state changes
+    {
+      boost::unique_lock<boost::recursive_mutex> lock(this->_mutex);
+
+      // if the user stopped recording in our wait cycle, ignore the changes as they'll be logged later
+      if(!this->_isRecording)
+        continue;
+
+      // pause the world to let it process messages
+      bool is_paused = this->_world->IsPaused();
+      this->_world->SetPaused(true);
+
+      // wait a short period for the world to update, playback will be slightly delayed but there's no
+      // way to check this safely - 250ms is probably 1000x longer than needed but this is ok until a
+      // better solution is required
+      this->_world->Step(1);
+      boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+      this->_world->UpdateStateSDF();
+
+      // stop recording and restart with the new world state, reuse the logic for between files while is
+      // much safer than trying to force it into replay (lots of race conditions in Gazebo playback)
+      std_srvs::Trigger trigger;
+      this->onStop(trigger.request, trigger.response);
+      this->onStart(trigger.request, trigger.response);
+
+      // restore the world state
+      this->_world->SetPaused(is_paused);
+    }
+  }
+}
+
+void GazeboRosRecordingPlugin::waitForChange(const boost::shared_ptr<gazebo::msgs::Model const> &modelMsg,
+                                             const boost::shared_ptr<gazebo::msgs::Light const> &lightMsg)
+{
+  // wait for a maximum time to ensure we don't just hang forever
+  int timeout = 5 * 1000; // 5 seconds
+  int elapsed = 0;
+  bool done = false;
+
+  while((!done) && (elapsed < timeout)) {
+
+    // wait for the model to reflect the change request
+    if(modelMsg)
+    {
+      auto model = this->_world->GetModel(modelMsg->name());
+      gazebo::msgs::Model updated;
+      updated.Clear();
+      model->FillMsg(updated);
+
+      // Modified from gazebo_ros_api, this is needed for the NRP messages for some reason
+      // check the individual link visuals as these are all that can be changed
+      done = false;
+      if(updated.link_size() == modelMsg->link_size()) {
+
+        // look at all link individually
+        done = true;
+        for (unsigned int i = 0; i < updated.link_size(); i++) {
+          auto msg_link = modelMsg->link().Get(i);
+          auto updated_link = updated.link().Get(i);
+
+          // make sure we have the same number of visuals as well
+          if(msg_link.visual_size() != updated_link.visual_size()) {
+            done = false;
+            continue;
+          }
+
+          // compare each link visual, abort if there are differences
+          for(unsigned int j = 0; j < updated_link.visual().size(); j++) {
+            auto msg_visual = msg_link.visual().Get(i);
+            auto updated_visual = updated_link.visual().Get(i);
+
+            // check that the visual materials exist
+            if(msg_visual.has_material() != updated_visual.has_material()) {
+              done = false;
+              continue;
+            }
+
+            // check that the materials are the same
+            if(msg_visual.material().DebugString() != updated_visual.material().DebugString()) {
+              done = false;
+              continue;
+            }
+          }
+        }
+      }
+    }
+
+    // wait for the light to relfect the change request
+    else
+    {
+      // create a mustable light to remove the pose for comparison
+      gazebo::msgs::Light target = *lightMsg;
+      if(target.has_pose())
+        target.mutable_pose()->Clear();
+
+      // get the current light state with no pose
+      auto light = this->_world->Light(lightMsg->name());
+      gazebo::msgs::Light updated;
+      updated.Clear();
+      light->FillMsg(updated);
+      if(updated.has_pose())
+        updated.mutable_pose()->Clear();
+
+      // perform the actual check of light parameters
+      done = (target.DebugString() == updated.DebugString());
+      if(done)
+      {
+        // unfortunately the SDF isn't updated by default, force it here
+        light->FillMsg(updated);
+        light->UpdateParameters(gazebo::msgs::LightToSDF(updated));
+      }
+    }
+
+    // don't spin at 100% cpu in between, even with a tiny sleep
+    boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    elapsed += 10;
+  }
+
+  // we didn't see the actual change, log it and exit (Gazbeo may be broken somewhere)
+  if(elapsed == timeout)
+  {
+    if(modelMsg)
+      ROS_ERROR("GazeboRosRecordingPlugin: model change was not seen for model %s", modelMsg->name().c_str());
+    else
+      ROS_ERROR("GazeboRosRecordingPlugin: light change was not seen for light %s", lightMsg->name().c_str());
+  }
 }
 
 // register this plugin with the simulator

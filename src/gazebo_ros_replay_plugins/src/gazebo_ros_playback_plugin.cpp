@@ -5,6 +5,7 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/unordered_map.hpp>
 
 namespace gazebo
 {
@@ -67,7 +68,7 @@ bool GazeboRosPlaybackPlugin::onConfigure(cle_ros_msgs::SimulationPlayback::Requ
       this->_recordingDir = dir;
 
       // playback configuration check files, if failed, abort
-      if(!this->setPlaybackIndex(1, true))
+      if(!this->setPlaybackIndex(1))
       {
         res.message = "Playback configuration failed, aborting!";
         res.success = false;
@@ -232,7 +233,7 @@ void GazeboRosPlaybackPlugin::playback()
       gz_thread.join();
 
       // we've reached the end of the current playback files
-      if(this->_isPlaying && this->_world->GetSimTime() == gazebo::util::LogPlay::Instance()->LogEndTime())
+      if(this->_isPlaying && this->_world->GetSimTime() >= gazebo::util::LogPlay::Instance()->LogEndTime())
       {
         // load the next files or rollover back to the start
         int next = this->_logIndex + 1;
@@ -248,7 +249,7 @@ void GazeboRosPlaybackPlugin::playback()
   }
 }
 
-bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index, bool initialize)
+bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index)
 {
   // assumes previous directory validation, internal use only
   boost::filesystem::path gz_dir = this->_recordingDir / "gzserver";
@@ -284,27 +285,81 @@ bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index, bool initialize)
   this->_gzFileStr = gz_file.native().c_str();
   gazebo::util::LogPlay::Instance()->Open(this->_gzFileStr);
 
-  // if this is the first run, initialize the world
-  if(initialize)
+  // properly update/delete models in the world with changes that
+  // may have happened between files, inserts are handled by playback
+  // get the SDF world description from the log file
+  gazebo::util::LogPlay::Instance()->Step(this->_sdfStr);
+
+  // load the sdf
+  this->_sdfPtr.reset(new sdf::SDF);
+  sdf::init(this->_sdfPtr);
+  sdf::readString(this->_sdfStr, this->_sdfPtr);
+
+  // strip plugins from the sdf
+  sdf::ElementPtr sdf_world = this->_sdfPtr->Root()->GetElement("world");
+  this->removeSDFPlugins(sdf_world);
+
+  // load all of the models and ligts into a name->SDF map for later
+  boost::unordered_map <std::string, sdf::ElementPtr> objects;
+  if(sdf_world->HasElement("model"))
   {
-    // get the SDF world description from the log file
-    gazebo::util::LogPlay::Instance()->Step(this->_sdfStr);
-
-    // load the sdf
-    this->_sdfPtr.reset(new sdf::SDF);
-    sdf::init(this->_sdfPtr);
-    sdf::readString(this->_sdfStr, this->_sdfPtr);
-
-    // strip plugins from the sdf
-    this->removeSDFPlugins(this->_sdfPtr->Root()->GetElement("world"));
-
-    // load the sdf in the world and start the playback loop (paused)
-    this->_world->Load(this->_sdfPtr->Root()->GetElement("world"));
-    this->_world->Run();
+    sdf::ElementPtr elem = sdf_world->GetElement("model");
+    while(elem)
+    {
+      objects[elem->GetAttribute("name")->GetAsString()] = elem;
+      elem = elem->GetNextElement("model");
+    }
+  }
+  if(sdf_world->HasElement("light"))
+  {
+    sdf::ElementPtr elem = sdf_world->GetElement("light");
+    while(elem)
+    {
+      objects[elem->GetAttribute("name")->GetAsString()] = elem;
+      elem = elem->GetNextElement("light");
+    }
   }
 
-  // force a single step to ensure the world is properly initializes
-  this->_world->Step(1);
+  // mark models for deletion / update them between scene changes
+  for(auto model : this->_world->GetModels())
+  {
+    // the model is no longer in the scene, mark for deletion
+    if(objects.find(model->GetName()) == objects.end())
+      this->_world->RemoveModel(model->GetName());
+
+    // check if the model SDF has changed
+    else if(model->UnscaledSDF()->ToString("") !=
+            objects[model->GetName()]->ToString(""))
+    {
+      // do a strange update sandwich otherwise fillmsg will except or fail to publish
+      // using model/modify causes a crash/race condition as well
+      model->UpdateParameters(objects[model->GetName()]);
+      gazebo::msgs::Model msg;
+      model->FillMsg(msg);
+      model->UpdateParameters(objects[model->GetName()]);
+    }
+  }
+
+  // mark lights for deletion / update them between scene changes
+  for(auto light : this->_world->Lights())
+  {
+    // the light is no longer in the scene, mark for deletion
+    if(objects.find(light->GetName()) == objects.end())
+      this->_world->RemoveModel(light->GetName());
+    else
+    {
+      // update the light in the world (e.g. position) and scene
+      auto msg = gazebo::msgs::LightFromSDF(objects[light->GetName()]);
+      this->_gz_nh->Advertise<gazebo::msgs::Light>("~/light/modify")->Publish(msg, true);
+    }
+  }
+
+  // rewind to let the logger run normally within gazebo
+  gazebo::util::LogPlay::Instance()->Rewind();
+
+  // before we advance, reset sim time for rollover loading
+  if(index == 1)
+    this->_world->ResetTime();
 
   // mark the current file index
   this->_logIndex = index;

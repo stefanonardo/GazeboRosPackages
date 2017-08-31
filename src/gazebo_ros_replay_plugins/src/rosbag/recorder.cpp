@@ -125,7 +125,7 @@ Recorder::Recorder(RecorderOptions const& options) :
     queue_size_(0),
     split_count_(0),
     writing_enabled_(true),
-    running_(false)
+    running_(true)
 {
 }
 
@@ -176,7 +176,6 @@ int Recorder::run() {
     ros::Subscriber trigger_sub;
 
     // NRP: set global running flag
-    running_ = true;
     boost::thread record_thread;
     if (options_.snapshot)
     {

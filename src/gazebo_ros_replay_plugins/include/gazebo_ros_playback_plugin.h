@@ -57,7 +57,7 @@ private:
   void playback();
 
   /// \brief Helper to set current playback file.
-  bool setPlaybackIndex(int index, bool initialize=false);
+  bool setPlaybackIndex(int index);
 
   /// \brief Helper method to strip SDF plugins, not needed.
   void removeSDFPlugins(sdf::ElementPtr elem);

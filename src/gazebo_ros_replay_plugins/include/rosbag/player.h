@@ -115,10 +115,10 @@ public:
 
     ros::Time const& getTime() const;
 
-    // NRP: added message time, use the real timestamp
-    void setMessageTime(const ros::Time& time);
+    // NRP: added limit time, the time to run until
+    void setLimitTime(const ros::Time& time);
 
-    ros::Time const& getMessageTime() const;
+    ros::Time const& getLimitTime() const;
 
     void runClock(const ros::WallDuration& duration);
 
@@ -144,7 +144,7 @@ private:
     ros::WallTime wc_horizon_;
     ros::Time horizon_;
     ros::Time current_;
-    ros::Time message_;
+    ros::Time limit_;
 };
 
 
@@ -186,6 +186,9 @@ private:
 
     // NRP: mutex to avoid shutdown race conditions
 		boost::mutex _shutdown_mutex;
+
+    // NRP: guard around setting run time limit
+    boost::mutex _limit_mutex;
 
     typedef std::map<std::string, ros::Publisher> PublisherMap;
 

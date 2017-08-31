@@ -46,6 +46,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <atomic>
 
 #include <boost/thread/condition.hpp>
 #include <boost/thread/mutex.hpp>
@@ -196,7 +197,7 @@ private:
     ros::WallTime                 check_disk_next_;
     ros::WallTime                 warn_next_;
 
-    bool                          running_;
+    std::atomic<bool>                         running_;
 		std::vector<boost::shared_ptr<ros::Subscriber>> subscribers_;
 
     // NRP: for gazebo based topics, track recording time for rate limiting

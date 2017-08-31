@@ -4,6 +4,12 @@ issues that could cause us to rewrite it, but it works for now.
 
 Changelog:
 
+2017.31.08
+- removed a race condition where recorder stop would not work if called before the
+  running flag was set, moved to the constructor to avoid conflicts
+- modified playback logic to include time limit for smoother and more consistent
+  playback than previous "burst" implementation that published all at once
+
 2017.22.08
 - do not record topics published by Gazebo/plugins by default
 - support white listing specific topic types from Gazebo (generalizable)

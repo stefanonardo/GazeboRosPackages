@@ -61,6 +61,12 @@ public:
   bool isRecording(std_srvs::Trigger::Request &req,
                    std_srvs::Trigger::Response &res);
 
+  /// \brief Handler for user model material changes.
+  void onModelChange(const boost::shared_ptr<gazebo::msgs::Model const> &msg);
+
+  /// \brief Handler for user light changes.
+  void onLightChange(const boost::shared_ptr<gazebo::msgs::Light const> &msg);
+
 protected:
 
   /// \brief The type of recorder plugin loaded.
@@ -68,11 +74,18 @@ protected:
 
 private:
 
+  /// \brief Monitor waiting threads and toggle recording when all changes are processed.
+  void processChanges();
+
+  /// \brief Wait for user driven changes off the main Gazebo thread.
+  void waitForChange(const boost::shared_ptr<gazebo::msgs::Model const> &modelMsg,
+                     const boost::shared_ptr<gazebo::msgs::Light const> &lightMsg);
+
   /// \brief State flag to indicate if we are recording.
-  bool _isRecording;
+  std::atomic<bool> _isRecording;
 
   /// \brief Total number of recorded segments, used for unique file paths.
-  int _recordCount;
+  std::atomic<int> _recordCount;
 
   /// \brief The path to the recordings, empty if not set.
   boost::filesystem::path _tmpDir;
@@ -98,11 +111,26 @@ private:
   /// \brief Gazebo publisher to logging interface.
   gazebo::transport::PublisherPtr _logControlPublisher;
 
+  /// \brief Gazebo subscriber for user model material changes during recording.
+  gazebo::transport::SubscriberPtr _materialSubscriber;
+
+  /// \brief Gazebo subscriber for user light changes during recording.
+  gazebo::transport::SubscriberPtr _lightSubscriber;
+
   /// \brief Rosbag recorder instance, source modified for the NRP.
   boost::shared_ptr<rosbag::Recorder> _rosbagPtr;
 
   /// \brief Rosbag thread for running record loop.
   boost::shared_ptr<boost::thread> _rosbagThreadPtr;
+
+  /// \brief Thread for handling/monitoring model and light changes.
+  boost::shared_ptr<boost::thread> _changeThreadPtr;
+
+  /// \brief List of running threads monitoring model/light changes.
+  std::queue<std::pair<gazebo::common::Time, boost::shared_ptr<boost::thread>>> _changeThreads;
+
+  /// \brief Mutex to protect concurrent access while monitoring changes.
+  boost::recursive_mutex _changeMutex;
 
 }; // class GazeboRosRecordingPlugin
 
