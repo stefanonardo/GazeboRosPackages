@@ -35,6 +35,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/TwistWithCovariance.h>
 #include <geometry_msgs/PoseWithCovariance.h>
+#include <gazebo_msgs/WheelSpeeds.h>
 
 #include <tf/transform_broadcaster.h>
 #include <ros/ros.h>
@@ -44,24 +45,25 @@
  * Desc: Gazebo 1.x plugin for a Clearpath Robotics Husky A200
  * Adapted from the TurtleBot plugin
  * Author: Ryan Gariepy
- */ 
+ */
 
 namespace gazebo
 {
   class HuskyPlugin : public ModelPlugin
   {
-    public: 
+    public:
       HuskyPlugin();
       virtual ~HuskyPlugin();
-          
+
       virtual void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf );
 
       virtual void UpdateChild();
-  
+
     private:
 
       void OnContact(const std::string &name, const physics::Contact &contact);
       void OnCmdVel( const geometry_msgs::TwistConstPtr &msg);
+      void OnWheelSpeeds( const gazebo_msgs::WheelSpeeds::ConstPtr &msg);
 
 
       /// Parameters
@@ -82,12 +84,13 @@ namespace gazebo
       float torque_;
 
       ros::NodeHandle *rosnode_;
-  
+
       ros::Publisher sensor_state_pub_;
       ros::Publisher odom_pub_;
       ros::Publisher joint_state_pub_;
-  
+
       ros::Subscriber cmd_vel_sub_;
+      ros::Subscriber wheel_speeds_sub_;
 
       physics::WorldPtr world_;
       physics::ModelPtr model_;

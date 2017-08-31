@@ -25,6 +25,7 @@ add_message_files(
 # NRP custom messages
   JointStates.msg
   OpenSimPhysics.msg
+  WheelSpeeds.msg
   )
 
 add_service_files(DIRECTORY srv FILES
