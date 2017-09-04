@@ -54,12 +54,13 @@
  * Desc: Gazebo 1.x plugin for a Clearpath Robotics Husky A200
  * Adapted from the TurtleBot plugin
  * Author: Ryan Gariepy
- */ 
+ */
 
 #include <boost/thread.hpp>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/Twist.h>
+#include <gazebo_msgs/WheelSpeeds.h>
 
 #include <husky_plugin/husky_plugin.h>
 
@@ -102,7 +103,7 @@ HuskyPlugin::~HuskyPlugin()
   delete [] wheel_speed_;
   delete rosnode_;
 }
-    
+
 void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
 {
   this->model_ = _parent;
@@ -167,6 +168,7 @@ void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   rosnode_ = new ros::NodeHandle( node_namespace_ );
 
   cmd_vel_sub_ = rosnode_->subscribe("husky/cmd_vel", 1, &HuskyPlugin::OnCmdVel, this );
+  wheel_speeds_sub_ = rosnode_->subscribe("husky/wheel_speeds", 1, &HuskyPlugin::OnWheelSpeeds, this);
 
   odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("odom", 1);
 
@@ -401,6 +403,23 @@ void HuskyPlugin::OnCmdVel( const geometry_msgs::TwistConstPtr &msg)
   wheel_speed_[FL] = vr - va * (wheel_sep_) / 2;
   wheel_speed_[FR] = vr + va * (wheel_sep_) / 2;
 }
+
+
+void HuskyPlugin::OnWheelSpeeds( const gazebo_msgs::WheelSpeeds::ConstPtr &msg )
+{
+  last_cmd_vel_time_ = this->world_->GetSimTime();
+  double back_left, back_right, front_left, front_right;
+  back_left = msg->back_left_wheel;
+  back_right = msg->back_right_wheel;
+  front_left = msg->front_left_wheel;
+  front_right = msg->front_right_wheel;
+
+  wheel_speed_[BL] = back_left;
+  wheel_speed_[BR] = back_right;
+  wheel_speed_[FL] = front_left;
+  wheel_speed_[FR] = front_right;
+}
+
 
 void HuskyPlugin::spin()
 {
