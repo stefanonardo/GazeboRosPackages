@@ -37,6 +37,7 @@
 
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Quaternion.h>
+#include <geometry_msgs/Pose.h>
 
 #include <ros/ros.h>
 
@@ -73,13 +74,22 @@ private:
   void CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller);
   // Create controller for parent model rotation
   void CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller);
+  // Create controller for link pose
+  void CreateControllerLinkPose(const sdf::ElementPtr &sdf_elem_controller);
   // Create controller for link velocity
-  void CreateControllerLinkVelocity(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerLinkLinearVelocity(const sdf::ElementPtr &sdf_elem_controller);
 
   // Generic model rotation command callback function (ROS topic)
   void ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg);
+  // Generic link pose command callback function (ROS topic)
+  void LinkPoseCB(const geometry_msgs::Pose::ConstPtr &msg, const physics::LinkPtr &link);
   // Generic link velocity command callback function (ROS topic)
-  void LinkVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+  void LinkLinearVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+
+  // update link velocities based on pose target
+  void UpdateLinkVelocitiesFromPoseTargets(const physics::LinkPtr &link);
+  void UpdateLinkLinearVelocityFromPositionTarget(const physics::LinkPtr &link);
+  void UpdateLinkAngularVelocityFromRotationTarget(const physics::LinkPtr &link);
 
   // ROS node handle
   ros::NodeHandle node_handle_;
@@ -92,17 +102,24 @@ private:
 
   // ROS subscribers
   std::vector<ros::Subscriber> subscribers_model_rotation_;
-  std::vector<ros::Subscriber> subscribers_link_velocity_;
+  std::vector<ros::Subscriber> subscribers_link_pose_;
+  std::vector<ros::Subscriber> subscribers_link_linear_velocity_;
 
   /// \brief keep track of controller update sim-time.
   gazebo::common::Time last_update_time_;
 
   /// \brief Controller update mutex.
   std::mutex mutex_;
-  
+
+  float rotation_velocity_speed_factor_;
+  //TODO: general speed factors for link velocities
+  //TODO: maybe better to set as parameter on a per controller basis
+  float link_linear_velocity_speed_factor_, link_angular_velocity_speed_factor_;
+  float link_pos_target_diff_threshold_, link_rot_target_diff_threshold_;
   // saves parent model rotation updates from topics (applied during OnUpdate() )
   gazebo::math::Quaternion model_target_rotation_;
-  float rotation_velocity_speed_factor_;
+  // pose targets for links
+  std::map<physics::LinkPtr, gazebo::math::Pose> link_pose_targets_;
   
   // whether to keep the parent model positioned on ground
   bool keep_model_on_ground_;
