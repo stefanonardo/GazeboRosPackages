@@ -1,6 +1,7 @@
 src/CMakeLists.txt
 
 # Generated directories
+
 catkin_ws/
 build_venv/
 build/
