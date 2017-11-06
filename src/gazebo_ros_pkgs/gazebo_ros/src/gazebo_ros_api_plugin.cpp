@@ -1138,6 +1138,30 @@ bool GazeboRosApiPlugin::setPhysicsProperties(gazebo_msgs::SetPhysicsProperties:
     res.success = true;
     res.status_message = "physics engine updated";
   }
+  // Let's just say it's just not ODE anymore now
+  else if (world_->GetPhysicsEngine()->GetType() == "opensim")
+  {
+    try
+    {
+      pe->SetParam("integrator_accuracy", req.opensim_config.integrator_accuracy);
+      pe->SetParam("min_step_size", req.opensim_config.min_step_size);
+      pe->SetParam("stiffness", req.opensim_config.stiffness);
+      pe->SetParam("dissipation", req.opensim_config.dissipation);
+      pe->SetParam("transitionVelocity", req.opensim_config.transitionVelocity);
+      pe->SetParam("staticFriction", req.opensim_config.staticFriction);
+      pe->SetParam("dynamicFriction", req.opensim_config.dynamicFriction);
+      pe->SetParam("viscousFriction", req.opensim_config.viscousFriction);
+    }
+    catch (boost::bad_any_cast& ex)
+    {
+      gzerr << "Exception setting OpenSim physics engine parameters: " << ex.what() << std::endl;
+    }
+
+    world_->SetPaused(is_paused);
+
+    res.success = true;
+    res.status_message = "physics engine updated";
+  }
   else
   {
     /// \TODO: add support for simbody, dart and bullet physics properties.
@@ -1201,37 +1225,19 @@ bool GazeboRosApiPlugin::getPhysicsProperties(gazebo_msgs::GetPhysicsProperties:
   {
     try
     {
-      std::cout << "Retrieving integrator type" << std::endl;
       res.opensim_config.integrator = boost::any_cast<std::string>(world_->GetPhysicsEngine()->GetParam("integrator_type"));
-      std::cout << "Retrieved integrator type" << std::endl;
-      std::cout << "Retrieving integrator accuracy" << std::endl;
       res.opensim_config.integrator_accuracy = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("integrator_accuracy"));
-      std::cout << "Retrieved integrator accuracy" << std::endl;
-      std::cout << "Retrieving min step size" << std::endl;
       res.opensim_config.min_step_size = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("min_step_size"));
-      std::cout << "Retrieved min step size" << std::endl;
-      std::cout << "Retrieving stiffness" << std::endl;
       res.opensim_config.stiffness = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("stiffness"));
-      std::cout << "Retrieved stiffness" << std::endl;
-      std::cout << "Retrieving dissipation" << std::endl;
       res.opensim_config.dissipation = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("dissipation"));
-      std::cout << "Retrieved dissipation" << std::endl;
-      std::cout << "Retrieving transition velocity" << std::endl;
       res.opensim_config.transitionVelocity = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("transitionVelocity"));
-      std::cout << "Retrieved transition velocity" << std::endl;
-      std::cout << "Retrieving static friction" << std::endl;
       res.opensim_config.staticFriction = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("staticFriction"));
-      std::cout << "Retrieved static friction" << std::endl;
-      std::cout << "Retrieving dynamic friction" << std::endl;
       res.opensim_config.dynamicFriction = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("dynamicFriction"));
-      std::cout << "Retrieved dynamic friction" << std::endl;
-      std::cout << "Retrieving viscous friction" << std::endl;
       res.opensim_config.viscousFriction = boost::any_cast<double>(world_->GetPhysicsEngine()->GetParam("viscousFriction"));
-      std::cout << "Retrieved viscous friction" << std::endl;
     }
     catch (boost::bad_any_cast& ex)
     {
-      std::cerr << "Fall-through exception for boost::any_cast; ignore for now: " << ex.what() << std::endl;
+      gzerr << "Exception getting parameters for OpenSim physics engine: " << ex.what() << std::endl;
     }
 
     res.success = true;
