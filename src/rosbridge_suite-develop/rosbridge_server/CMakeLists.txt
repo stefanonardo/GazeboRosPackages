@@ -12,6 +12,7 @@ install(PROGRAMS
   scripts/rosbridge_websocket
   scripts/rosbridge_tcp.py
   scripts/rosbridge_tcp
+  scripts/ros_commander.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
