@@ -2,5 +2,5 @@
 host=bbpcode.epfl.ch
 port=22
 project=neurorobotics/GazeboRosPackages
-defaultbranch=master
+defaultbranch=development
 defaultremote=origin
