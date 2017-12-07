@@ -25,6 +25,7 @@
 #include <gazebo/rendering/RenderingIface.hh>
 #include <gazebo/rendering/Scene.hh>
 #include <gazebo_ros/gazebo_ros_api_plugin.h>
+#include <gazebo/msgs/msgs.hh>
 
 namespace gazebo
 {
@@ -36,6 +37,7 @@ GazeboRosApiPlugin::GazeboRosApiPlugin() :
   plugin_loaded_(false),
   pub_link_states_connection_count_(0),
   pub_model_states_connection_count_(0),
+  pub_contact_data_connection_count_(0),
   pub_clock_frequency_(0)
 {
 }
@@ -60,6 +62,10 @@ GazeboRosApiPlugin::~GazeboRosApiPlugin()
   gazebo::event::Events::DisconnectWorldUpdateBegin(wrench_update_event_);
   gazebo::event::Events::DisconnectWorldUpdateBegin(force_update_event_);
   gazebo::event::Events::DisconnectWorldUpdateBegin(time_update_event_);
+
+  // NRP: Disconnect contact data callback event
+  gazebo::event::Events::DisconnectWorldUpdateEnd(contacts_update_event_);
+
   ROS_DEBUG_STREAM_NAMED("api_plugin","Slots disconnected");
 
   if (pub_link_states_connection_count_ > 0) // disconnect if there are subscribers on exit
@@ -328,6 +334,14 @@ void GazeboRosApiPlugin::advertiseServices()
                                                             ros::VoidPtr(), &gazebo_queue_);
   pub_model_states_ = nh_->advertise(pub_model_states_ao);
 
+  // NRP: publish contact point data after each simulation step
+  ros::AdvertiseOptions pub_contact_data_ao =
+    ros::AdvertiseOptions::create<gazebo_msgs::ContactsState>(
+                                                            "contact_point_data",10,
+                                                            boost::bind(&GazeboRosApiPlugin::onContactPointDataConnect,this),
+                                                            boost::bind(&GazeboRosApiPlugin::onContactPointDataDisconnect,this),
+                                                            ros::VoidPtr(), &gazebo_queue_);
+  pub_contact_data_ = nh_->advertise(pub_contact_data_ao);
 
   // Advertise more services on the custom queue
   std::string set_link_properties_service_name("set_link_properties");
@@ -503,7 +517,7 @@ void GazeboRosApiPlugin::onLinkStatesDisconnect()
   {
     gazebo::event::Events::DisconnectWorldUpdateBegin(pub_link_states_event_);
     if (pub_link_states_connection_count_ < 0) // should not be possible
-      ROS_ERROR("one too mandy disconnect from pub_link_states_ in gazebo_ros.cpp? something weird");
+      ROS_ERROR("one too many disconnect from pub_link_states_ in gazebo_ros.cpp? something weird");
   }
 }
 
@@ -514,9 +528,35 @@ void GazeboRosApiPlugin::onModelStatesDisconnect()
   {
     gazebo::event::Events::DisconnectWorldUpdateBegin(pub_model_states_event_);
     if (pub_model_states_connection_count_ < 0) // should not be possible
-      ROS_ERROR("one too mandy disconnect from pub_model_states_ in gazebo_ros.cpp? something weird");
+      ROS_ERROR("one too many disconnect from pub_model_states_ in gazebo_ros.cpp? something weird");
   }
 }
+
+void GazeboRosApiPlugin::onContactPointDataConnect()
+{
+  ROS_DEBUG_STREAM_NAMED("api_plugin", "Contact point subscriber connecting");
+  pub_contact_data_connection_count_++;
+  if (pub_contact_data_connection_count_ == 1) // connect on first subscriber
+  {
+    contacts_sub_ = gazebonode_->Subscribe("~/physics/contacts",
+      &GazeboRosApiPlugin::onContactPointDataReceived, this);
+    ROS_DEBUG_STREAM_NAMED("api_plugin","Subscribed to gazebo contact message");
+  }
+}
+
+void GazeboRosApiPlugin::onContactPointDataDisconnect()
+{
+  ROS_DEBUG_STREAM_NAMED("api_plugin","Contact point subscriber disconnecting");
+  pub_contact_data_connection_count_--;
+  if (pub_contact_data_connection_count_ <= 0) // disconnect with no subscribers
+  {
+    contacts_sub_.reset();
+    if (pub_contact_data_connection_count_ < 0)
+      ROS_ERROR("one too many disconnect from pub_contact_data_ in gazebo_ros.cpp? something weird");
+    ROS_DEBUG_STREAM_NAMED("api_plugin","Subscriber to gazebo contact message deleted");
+  }
+}
+
 
 bool GazeboRosApiPlugin::spawnURDFEntity(gazebo_msgs::SpawnEntity::Request &req,
                                          gazebo_msgs::SpawnEntity::Response &res)
@@ -1920,6 +1960,26 @@ void GazeboRosApiPlugin::publishLinkStates()
         twist.angular.y = angular_vel.y;
         twist.angular.z = angular_vel.z;
         link_states.twist.push_back(twist);
+        // accelerations
+        gazebo::math::Vector3 linear_accel = body->GetWorldLinearAccel();
+        gazebo::math::Vector3 angular_accel = body->GetWorldAngularAccel();
+        twist.linear.x = linear_accel.x;
+        twist.linear.y = linear_accel.y;
+        twist.linear.z = linear_accel.z;
+        twist.angular.x = angular_accel.x;
+        twist.angular.y = angular_accel.y;
+        twist.angular.z = angular_accel.z;
+        link_states.accel.push_back(twist);
+        // forces
+        gazebo::math::Vector3 force = body->GetWorldForce();
+        gazebo::math::Vector3 torque = body->GetWorldTorque();
+        twist.linear.x = force.x;
+        twist.linear.y = force.y;
+        twist.linear.z = force.z;
+        twist.angular.x = torque.x;
+        twist.angular.y = torque.y;
+        twist.angular.z = torque.z;
+        link_states.force.push_back(twist);
       }
     }
   }
@@ -1968,6 +2028,83 @@ void GazeboRosApiPlugin::publishModelStates()
     model_states.twist.push_back(twist);
   }
   pub_model_states_.publish(model_states);
+}
+
+void GazeboRosApiPlugin::onContactPointDataReceived(ConstContactsPtr &_msg)
+{
+  gazebo_msgs::ContactsState contacts_state;  // ROS
+  for (int i = 0; i < _msg->contact_size(); i++)
+  {
+    gazebo::msgs::Contact gz_contact_msg = _msg->contact(i);
+
+    gazebo_msgs::ContactState contact_msg;
+    contact_msg.collision1_name = gz_contact_msg.collision1();
+    contact_msg.collision2_name = gz_contact_msg.collision2();
+
+    for (size_t i = 0; i < gz_contact_msg.normal_size(); ++i)
+    {
+      geometry_msgs::Vector3 normal_vec;
+      normal_vec.x = gz_contact_msg.normal(i).x();
+      normal_vec.y = gz_contact_msg.normal(i).y();
+      normal_vec.z = gz_contact_msg.normal(i).z();
+      contact_msg.contact_normals.push_back(normal_vec);
+    }
+
+    for (size_t i = 0; i < gz_contact_msg.position_size(); ++i)
+    {
+      geometry_msgs::Vector3 position_vec;
+      position_vec.x = gz_contact_msg.position(i).x();
+      position_vec.y = gz_contact_msg.position(i).y();
+      position_vec.z = gz_contact_msg.position(i).z();
+      contact_msg.contact_positions.push_back(position_vec);
+    }
+
+    for (size_t i = 0; i < gz_contact_msg.depth_size(); ++i)
+    {
+      contact_msg.depths.push_back(gz_contact_msg.depth(i));
+    }
+
+    gazebo::math::Vector3 total_force = gazebo::math::Vector3::Zero;
+    gazebo::math::Vector3 total_torque = gazebo::math::Vector3::Zero;
+    for (size_t i = 0; i < gz_contact_msg.wrench_size(); ++i)
+    {
+      geometry_msgs::Wrench wrench;
+      geometry_msgs::Vector3 force_vec;
+      force_vec.x = gz_contact_msg.wrench(i).body_1_wrench().force().x();
+      force_vec.y = gz_contact_msg.wrench(i).body_1_wrench().force().y();
+      force_vec.z = gz_contact_msg.wrench(i).body_1_wrench().force().z();
+      wrench.force = force_vec;
+
+      geometry_msgs::Vector3 torque_vec;
+      torque_vec.x = gz_contact_msg.wrench(i).body_1_wrench().torque().x();
+      torque_vec.y = gz_contact_msg.wrench(i).body_1_wrench().torque().y();
+      torque_vec.z = gz_contact_msg.wrench(i).body_1_wrench().torque().z();
+      wrench.torque = torque_vec;
+
+      contact_msg.wrenches.push_back(wrench);
+
+      total_force += gazebo::math::Vector3(
+        gz_contact_msg.wrench(i).body_1_wrench().force().x(),
+        gz_contact_msg.wrench(i).body_1_wrench().force().y(),
+        gz_contact_msg.wrench(i).body_1_wrench().force().z()
+      );
+      total_torque += gazebo::math::Vector3(
+        gz_contact_msg.wrench(i).body_1_wrench().torque().x(),
+        gz_contact_msg.wrench(i).body_1_wrench().torque().y(),
+        gz_contact_msg.wrench(i).body_1_wrench().torque().z()
+      );
+    }
+    contact_msg.total_wrench.force.x = total_force.x;
+    contact_msg.total_wrench.force.y = total_force.y;
+    contact_msg.total_wrench.force.z = total_force.z;
+    contact_msg.total_wrench.torque.x = total_torque.x;
+    contact_msg.total_wrench.torque.y = total_torque.y;
+    contact_msg.total_wrench.torque.z = total_torque.z;
+
+    contacts_state.states.push_back(contact_msg);
+  }
+
+  pub_contact_data_.publish(contacts_state);
 }
 
 void GazeboRosApiPlugin::physicsReconfigureCallback(gazebo_ros::PhysicsConfig &config, uint32_t level)

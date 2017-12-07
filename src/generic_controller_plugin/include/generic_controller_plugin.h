@@ -36,6 +36,7 @@
 #include <gazebo/transport/Publisher.hh>
 
 #include <std_msgs/Float64.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <geometry_msgs/Vector3.h>
 #include <sensor_msgs/JointState.h>
 #include <generic_controller_plugin/SetPIDParameters.h>
@@ -135,6 +136,8 @@ private:
   // ROS joint state publisher
   private: ros::Publisher m_joint_state_pub;
   private: sensor_msgs::JointState m_js;
+  private: ros::Publisher m_joint_accel_pub;
+  private: std_msgs::Float32MultiArray m_ja;
   // ROS joint controller parameter setter service
   private: ros::ServiceServer m_setPIDParameterService;
   

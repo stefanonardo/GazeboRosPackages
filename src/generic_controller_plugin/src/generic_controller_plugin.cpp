@@ -51,7 +51,8 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   // Store the pointer to the model
   m_model = parent;
   m_joint_controller = m_model->GetJointController();
-  m_joints = m_joint_controller->GetJoints();
+  if (m_joint_controller) // Null if there are no joints
+    m_joints = m_joint_controller->GetJoints();
 
   //sdf::ElementPtr sdf->GetElement("");
   ROS_INFO("sdf name %s, sdf description %s", sdf->GetName().c_str(), sdf->GetDescription().c_str());
@@ -153,6 +154,13 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
       boost::bind(&GenericControlPlugin::getJointPropertiesCB, this, _1, _2)
       
   );
+
+  m_ja.layout.dim.resize(1);
+  m_ja.layout.dim[0].label = "accelerations";
+  m_ja.layout.dim[0].size  = numJoints;
+  m_ja.layout.dim[0].stride = 1;
+  m_ja.data.resize(numJoints);
+  this->m_joint_accel_pub = m_nh.advertise<std_msgs::Float32MultiArray>( "joint_accel", 10 );
 }
 
 // Called by the world update start event
@@ -164,7 +172,6 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 
   if (curTime > this->lastControllerUpdateTime)
   {
-
     m_js.header.stamp.sec = curTime.sec;
     m_js.header.stamp.nsec = curTime.nsec;
     // Update the control surfaces and publish the new state.
@@ -176,9 +183,11 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
       m_js.position[curr_ind] = joint->GetAngle(0).Radian();
       m_js.velocity[curr_ind] = joint->GetVelocity(0);
       m_js.effort[curr_ind] = joint->GetForce(0);
+      m_ja.data[curr_ind] = joint->GetAcceleration(0);
     }
 
     m_joint_state_pub.publish ( m_js );
+    m_joint_accel_pub.publish ( m_ja );
   }
   this->lastControllerUpdateTime = curTime;
 

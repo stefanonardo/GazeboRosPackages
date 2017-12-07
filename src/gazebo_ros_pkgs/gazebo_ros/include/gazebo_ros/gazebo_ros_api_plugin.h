@@ -72,6 +72,9 @@
 #include "gazebo_msgs/SetLinkState.h"
 #include "gazebo_msgs/GetLinkState.h"
 
+#include "gazebo_msgs/ContactState.h"
+#include "gazebo_msgs/ContactsState.h"
+
 // Topics
 #include "gazebo_msgs/ModelState.h"
 #include "gazebo_msgs/LinkState.h"
@@ -172,6 +175,15 @@ public:
 
   /// \brief
   void onModelStatesDisconnect();
+
+  /// \brief
+  void onContactPointDataConnect();
+
+  /// \brief
+  void onContactPointDataDisconnect();
+
+  /// \brief Called by gazebo transport interface when new contact points arrive. Relays to ros publisher.
+  void onContactPointDataReceived(ConstContactsPtr &_msg);
 
   /// \brief Function for inserting a URDF into Gazebo from ROS Service Call
   bool spawnURDFEntity(gazebo_msgs::SpawnEntity::Request &req,
@@ -396,6 +408,7 @@ private:
   gazebo::transport::PublisherPtr factory_pub_;
   gazebo::transport::PublisherPtr request_pub_;
   gazebo::transport::SubscriberPtr response_sub_;
+  gazebo::transport::SubscriberPtr contacts_sub_;
 
   boost::shared_ptr<ros::NodeHandle> nh_;
   ros::CallbackQueue gazebo_queue_;
@@ -408,6 +421,9 @@ private:
   gazebo::event::ConnectionPtr pub_link_states_event_;
   gazebo::event::ConnectionPtr pub_model_states_event_;
   gazebo::event::ConnectionPtr load_gazebo_ros_api_plugin_event_;
+
+  // NRP: To query contact points at the end of each simulation time step
+  gazebo::event::ConnectionPtr contacts_update_event_;
 
   ros::ServiceServer spawn_sdf_entity_service_;
   ros::ServiceServer spawn_urdf_entity_service_;
@@ -437,6 +453,9 @@ private:
   ros::Subscriber    set_model_state_topic_;
   ros::Publisher     pub_link_states_;
   ros::Publisher     pub_model_states_;
+
+  // NRP: Publisher for contact point data
+  ros::Publisher     pub_contact_data_;
 
   // ROS comm
   boost::shared_ptr<ros::AsyncSpinner> async_ros_spin_;
@@ -507,6 +526,8 @@ private:
 
   int                pub_link_states_connection_count_;
   int                pub_model_states_connection_count_;
+
+  int                pub_contact_data_connection_count_;
 
   gazebo::msgs::Scene nrp_gazeboscene_;
   bool nrp_scene_update_done_;
