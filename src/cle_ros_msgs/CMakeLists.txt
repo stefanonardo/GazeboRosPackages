@@ -80,6 +80,7 @@ add_service_files(
    SetStructuredTransferFunction.srv
    AddTransferFunction.srv
    EditTransferFunction.srv
+   ActivateTransferFunction.srv
    Trigger.srv
    ExtendTimeout.srv
    SimulationRecorder.srv
