@@ -58,6 +58,8 @@ add_service_files(DIRECTORY srv FILES
   GetVisualProperties.srv
   SetLightProperties.srv
   SetVisualProperties.srv
+  SetSensorNoiseProperties.srv
+  GetSensorNoiseProperties.srv
   )
 
 generate_messages(DEPENDENCIES

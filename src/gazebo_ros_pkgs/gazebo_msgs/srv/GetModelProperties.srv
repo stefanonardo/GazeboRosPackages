@@ -6,6 +6,10 @@ string[] body_names                  # list of bodies, body names are prefixed b
 string[] geom_names                  # list of geoms
 string[] joint_names                 # list of joints attached to the model
 string[] child_model_names           # list of child models
+string[] sensor_names		     # list of sensor names
+string[] sensor_types                # list of sensor types
+string[] camera_names                # list of camera names
+string[] rostopic_camera_urls        # list of rostopic sensor URLs
 bool is_static                       # returns true if model is static
 bool success                         # return true if get successful
 string status_message                # comments if available

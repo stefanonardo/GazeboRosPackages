@@ -942,6 +942,36 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
         res.child_model_names.push_back(child_model->GetName() );
     }
 
+    // get list of sensors
+    res.sensor_names.clear();
+    std::vector<std::string> sensors = model->GetSensorNames();
+
+    for (unsigned int i=0; i< sensors.size(); i++)
+    {
+        res.sensor_names.push_back(sensors[i]);
+    }
+
+    // get list of sensor types
+    res.sensor_types.clear();
+    std::vector<std::string> sensor_types_names = model->GetSensorTypeNames();
+
+    for (unsigned int i=0; i< sensor_types_names.size(); i++)
+    {
+        res.sensor_types.push_back(sensor_types_names[i]);
+    }
+
+    // get list of camera RosTopics
+    res.camera_names.clear();
+    res.rostopic_camera_urls.clear();
+
+    std::map<std::string,std::string> rostopicsensors = model->GetSensorRosTopics();
+
+    for (std::map<std::string,std::string>::iterator it = rostopicsensors.begin(); it != rostopicsensors.end(); it++ )
+    {
+        res.camera_names.push_back(it->first);
+        res.rostopic_camera_urls.push_back(it->second);
+    }
+
     // is model static
     res.is_static = model->IsStatic();
 
@@ -2689,6 +2719,25 @@ void GazeboRosApiPlugin::nrpAdvertiseServices() {
                                                           boost::bind(&GazeboRosApiPlugin::nrpRequestSceneInfo,this,_1,_2),
                                                           ros::VoidPtr(), &gazebo_queue_);
   nrp_request_scene_info_service_ = nh_->advertiseService(request_scene_info_aso);
+
+  // Sets the parameters for the sensor noise model used
+  std::string set_sensor_noise_properties_service_name("set_sensor_noise_properties");
+  ros::AdvertiseServiceOptions set_sensor_noise_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::SetSensorNoiseProperties>(
+                                                                   set_sensor_noise_properties_service_name,
+                                                                   boost::bind(&GazeboRosApiPlugin::nrpSetSensorNoiseProperties,this,_1,_2),
+                                                                   ros::VoidPtr(), &gazebo_queue_);
+  nrp_set_sensor_noise_properties_service_ = nh_->advertiseService(set_sensor_noise_properties_aso);
+
+  // Gets the parameters for the sensor noise model used
+  std::string get_sensor_noise_properties_service_name("get_sensor_noise_properties");
+  ros::AdvertiseServiceOptions get_sensor_noise_properties_aso =
+    ros::AdvertiseServiceOptions::create<gazebo_msgs::GetSensorNoiseProperties>(
+                                                                   get_sensor_noise_properties_service_name,
+                                                                   boost::bind(&GazeboRosApiPlugin::nrpGetSensorNoiseProperties,this,_1,_2),
+                                                                   ros::VoidPtr(), &gazebo_queue_);
+  nrp_get_sensor_noise_properties_service_ = nh_->advertiseService(get_sensor_noise_properties_aso);
+
 }
 
 bool GazeboRosApiPlugin::nrpAdvanceSimulation(gazebo_msgs::AdvanceSimulation::Request &req,
@@ -3027,6 +3076,118 @@ bool GazeboRosApiPlugin::nrpRequestSceneInfo(std_srvs::Empty::Request &req,
   //TODO: (maybe) publish on a dedicated ROS topic 
   this->nrpPublishRequest("scene_info", "");
   return true;
+}
+
+bool GazeboRosApiPlugin::nrpSetSensorNoiseProperties(gazebo_msgs::SetSensorNoiseProperties::Request &req,
+                                                     gazebo_msgs::SetSensorNoiseProperties::Response &res)
+{
+    gazebo::physics::ModelPtr model = world_->GetModel(req.model_name);
+    if (!model)
+    {
+      res.success = false;
+      res.status_message = "SetSensorNoiseProperties: model does not exist";
+      return true;
+    }
+    else
+    {
+        bool sensor_found = false;
+        bool sensor_type_found = false;
+
+        std::map<std::string, std::tuple<std::string, std::string, std::string>> noise_sensors = model->GetSensorNoisesInformation();
+
+        auto it = noise_sensors.find(req.sensor_name);
+        if (it != noise_sensors.end())
+        {
+            sensor_found = true;
+            if (std::get<0>(it->second) == "gaussian")
+            {
+                it->second = std::make_tuple(std::get<0>(it->second), std::to_string(req.mean), std::to_string(req.std_dev));
+                sensor_type_found = true;
+
+                std::cout << "Data pushed: " << it->first << ", " << std::get<2>(it->second).c_str() << std::endl;
+
+                if(model->SetSensorNoiseParameters(it))
+                {
+                    res.success = true;
+                    res.status_message = "SetSensorNoiseProperties: Sensor data Updated";
+                }
+                else
+                {
+                    res.success = false;
+                    res.status_message = "SetSensorNoiseProperties: Sensor data NOT Updated";
+                }
+            }
+        }
+
+        if(!sensor_found)
+        {
+            res.success = false;
+            res.status_message = "SetSensorNoiseProperties: Sensor_name NOT found";
+        }
+        else if (sensor_found && !sensor_type_found)
+        {
+            res.success = false;
+            res.status_message = "SetSensorNoiseProperties: Type of noise of sensor not gaussian";
+        }
+        return true;
+    }
+
+}
+
+bool GazeboRosApiPlugin::nrpGetSensorNoiseProperties(gazebo_msgs::GetSensorNoiseProperties::Request &req,
+                                                     gazebo_msgs::GetSensorNoiseProperties::Response &res)
+{
+    gazebo::physics::ModelPtr model = world_->GetModel(req.model_name);
+    if (!model)
+    {
+      res.success = false;
+      res.status_message = "GetSensorNoiseProperties: model does not exist";
+      return true;
+    }
+    else
+    {
+        bool name_found = false;
+        bool noise_model_found = false;
+        std::map<std::string, std::tuple<std::string, std::string, std::string>> noise_sensors = model->GetSensorNoisesInformation();
+
+        auto it = noise_sensors.find(req.sensor_name);
+        if (it != noise_sensors.end())
+        {
+            name_found = true;
+            if (std::get<0>(it->second) != "")
+            {
+                res.type_noise = std::get<0>(it->second);
+                res.mean = atof(std::get<1>(it->second).c_str());
+                res.std_dev = atof(std::get<2>(it->second).c_str());
+                noise_model_found = true;
+            }
+        }
+
+        if (name_found == true && noise_model_found == true)
+        {
+            res.success = true;
+            res.status_message = "GetSensorNoiseProperties: Sensor_name found, Noise Properties found";
+        }
+        else if (name_found == true && noise_model_found == false)
+        {
+            res.type_noise = "";
+            res.mean = 0.0;
+            res.std_dev = 0.0;
+            res.success = false;
+            res.status_message = "GetSensorNoiseProperties: Sensor_name found, No Noise element in model";
+        }
+        else
+        {
+            res.type_noise = "";
+            res.mean = 0.0;
+            res.std_dev = 0.0;
+            res.success = false;
+            res.status_message = "GetSensorNoiseProperties: Sensor_name NOT found";
+        }
+
+        return true;
+    }
+
 }
 
 // ===================================================

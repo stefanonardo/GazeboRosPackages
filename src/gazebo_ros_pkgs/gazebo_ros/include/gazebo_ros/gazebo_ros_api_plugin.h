@@ -41,6 +41,7 @@
 #include <ros/subscribe_options.h>
 #include <ros/package.h>
 #include <rosgraph_msgs/Clock.h>
+//#include <ros/master.h>
 
 // Services
 #include "std_srvs/Empty.h"
@@ -111,6 +112,8 @@
 #include "gazebo_msgs/ExportWorldSDF.h"
 #include "gazebo_msgs/GetLightsName.h"
 #include "gazebo_msgs/DeleteLight.h"
+#include "gazebo_msgs/SetSensorNoiseProperties.h"
+#include "gazebo_msgs/GetSensorNoiseProperties.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -324,6 +327,12 @@ public:
   /// \brief
   bool nrpRequestSceneInfo(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 
+  /// \brief
+  bool nrpSetSensorNoiseProperties(gazebo_msgs::SetSensorNoiseProperties::Request &req, gazebo_msgs::SetSensorNoiseProperties::Response &res);
+
+  /// \brief
+  bool nrpGetSensorNoiseProperties(gazebo_msgs::GetSensorNoiseProperties::Request &req, gazebo_msgs::GetSensorNoiseProperties::Response &res);
+
   // ===================================================
   // END Custom NRP public attributes & methods
   // ===================================================
@@ -521,6 +530,8 @@ private:
   ros::ServiceServer nrp_export_world_sdf_service_;
   ros::ServiceServer nrp_wait_for_rendering_service_;
   ros::ServiceServer nrp_request_scene_info_service_;
+  ros::ServiceServer nrp_set_sensor_noise_properties_service_;
+  ros::ServiceServer nrp_get_sensor_noise_properties_service_;
 
   gazebo::transport::PublisherPtr nrp_factory_light_pub_;
 

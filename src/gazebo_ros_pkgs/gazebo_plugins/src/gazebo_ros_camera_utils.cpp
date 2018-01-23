@@ -316,6 +316,15 @@ void GazeboRosCameraUtils::LoadThread()
              this->image_topic_name_.c_str());
   }
 
+  std::string rostopic = this->camera_name_.c_str();
+  rostopic += "/";
+  rostopic += this->image_topic_name_.c_str();
+
+  physics::ModelPtr parent_model = this->world_->GetModel(GetModelName(this->parentSensor_));
+
+  // Call RosTopicNames
+  parent_model->SaveSensorRosTopicNames(this->camera_name_.c_str() ,rostopic);
+
   this->image_pub_ = this->itnode_->advertise(
     this->image_topic_name_, 2,
     boost::bind(&GazeboRosCameraUtils::ImageConnect, this),
@@ -631,7 +640,6 @@ void GazeboRosCameraUtils::PublishCameraInfo(
 
   camera_info_publisher.publish(camera_info_msg);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Put camera_ data to the interface
