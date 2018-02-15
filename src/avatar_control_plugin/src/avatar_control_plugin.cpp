@@ -98,10 +98,12 @@ void AvatarControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
     ray->GetIntersection(distance, entity_name);
     if (!entity_name.empty())
     {
-      model_world_pose.pos = ground_ray_start - (distance * up);
+      gazebo::math::Vector3 vec_to_ground = (ground_ray_start - (distance * up)) - model_world_pose.pos;
+      if (vec_to_ground.GetLength()  > 0.05f) {
+        this->model_->SetLinearVel(vec_to_ground * 30);
+      }
     }
   }
-  this->model_->SetWorldPose(model_world_pose);
   
   // set angular velocity from target model rotation (this->model_target_rotation_)
   math::Vector3 model_angular_velocity = math::Vector3::Zero;
