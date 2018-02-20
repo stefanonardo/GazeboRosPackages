@@ -170,6 +170,8 @@ void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   cmd_vel_sub_ = rosnode_->subscribe("husky/cmd_vel", 1, &HuskyPlugin::OnCmdVel, this );
   wheel_speeds_sub_ = rosnode_->subscribe("husky/wheel_speeds", 1, &HuskyPlugin::OnWheelSpeeds, this);
 
+  model_->SaveActuatorsHuskyRosTopics("husky_cmd_vel", "husky/cmd_vel", "husky_wheel_speeds", "husky/wheel_speeds");
+
   odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("odom", 1);
 
   joint_state_pub_ = rosnode_->advertise<sensor_msgs::JointState>("joint_states", 1);

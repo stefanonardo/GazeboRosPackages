@@ -972,6 +972,18 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
         res.rostopic_camera_urls.push_back(it->second);
     }
 
+    // get a list of Actuator Rostopics
+    res.actuators.clear();
+    res.rostopic_actuator_urls.clear();
+
+    std::map<std::string,std::string> rostopic_actuator = model->GetActuatorRosTopics();
+
+    for (std::map<std::string,std::string>::iterator it = rostopic_actuator.begin(); it != rostopic_actuator.end(); it++ )
+    {
+        res.actuators.push_back(it->first);
+        res.rostopic_actuator_urls.push_back(it->second);
+    }
+
     // is model static
     res.is_static = model->IsStatic();
 
