@@ -1,5 +1,6 @@
 string model_name                               # name of Gazebo Model
 string sensor_name                              # name of sensor
+string noise_type                               # noise type of sensor
 float32  mean                                   # mean value of gaussian model
 float32  std_dev                                # standard deviation of gaussian model
 ---

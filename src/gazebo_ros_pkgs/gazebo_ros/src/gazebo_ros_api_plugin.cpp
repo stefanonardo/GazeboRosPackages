@@ -3099,17 +3099,33 @@ bool GazeboRosApiPlugin::nrpSetSensorNoiseProperties(gazebo_msgs::SetSensorNoise
         if (it != noise_sensors.end())
         {
             sensor_found = true;
-            if (std::get<0>(it->second) == "gaussian")
+            if (req.noise_type == "gaussian")
             {
-                it->second = std::make_tuple(std::get<0>(it->second), std::to_string(req.mean), std::to_string(req.std_dev));
+                it->second = std::make_tuple(req.noise_type, std::to_string(req.mean), std::to_string(req.std_dev));
                 sensor_type_found = true;
-
-                std::cout << "Data pushed: " << it->first << ", " << std::get<2>(it->second).c_str() << std::endl;
 
                 if(model->SetSensorNoiseParameters(it))
                 {
                     res.success = true;
                     res.status_message = "SetSensorNoiseProperties: Sensor data Updated";
+                }
+                else
+                {
+                    res.success = false;
+                    res.status_message = "SetSensorNoiseProperties: Sensor data NOT Updated";
+                }
+            }
+            else
+            {
+                it->second = std::make_tuple(req.noise_type, std::to_string(req.mean), std::to_string(req.std_dev));
+                sensor_type_found = true;
+
+                std::cout << "Noise type input: " << req.noise_type << std::endl;
+
+                if(model->SetSensorNoiseParameters(it))
+                {
+                    res.success = true;
+                    res.status_message = "SetSensorNoiseProperties: Sensor data not Gaussian Noise Updated";
                 }
                 else
                 {
