@@ -318,7 +318,7 @@ void GenericControlPlugin::createPositionController(const physics::JointPtr &joi
                                                             boost::bind(&GenericControlPlugin::positionCB, this, _1, joint)));
 
   // Store information of Actuator in Model class
-  m_model->SaveGenericControllerActuatorRosTopics(joint->GetName().c_str(), topic_name);
+  m_model->SaveControllerActuatorRosTopics(topic_name);
 
   // Create PID parameter for position controller
   m_joint_controller->SetPositionPID(joint->GetScopedName(), pid_param);
@@ -338,7 +338,7 @@ void GenericControlPlugin::createVelocityController(const physics::JointPtr &joi
   m_vel_sub_vec.push_back(m_nh.subscribe<std_msgs::Float64>(topic_name, 1,
                                                             boost::bind(&GenericControlPlugin::velocityCB, this, _1, joint)));
   // Store information of Actuator in Model class
-  m_model->SaveGenericControllerActuatorRosTopics(joint->GetName().c_str(), topic_name);
+  m_model->SaveControllerActuatorRosTopics(topic_name);
 
   // Create PID parameter for velocity controller
   m_joint_controller->SetVelocityPID(joint->GetScopedName(), pid_param);

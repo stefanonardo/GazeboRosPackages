@@ -165,6 +165,9 @@ void GazeboRosDiffDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _sdf 
                 ros::VoidPtr(), &queue_);
 
     cmd_vel_subscriber_ = gazebo_ros_->node()->subscribe(so);
+
+    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_);
+
     ROS_INFO("%s: Subscribe to %s!", gazebo_ros_->info(), command_topic_.c_str());
 
     if (this->publish_tf_)

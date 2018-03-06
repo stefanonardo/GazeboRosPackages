@@ -140,6 +140,8 @@ void GazeboRosTricycleDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _
                 boost::bind ( &GazeboRosTricycleDrive::cmdVelCallback, this, _1 ),
                 ros::VoidPtr(), &queue_ );
 
+    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_);
+
     cmd_vel_subscriber_ = gazebo_ros_->node()->subscribe ( so );
     ROS_INFO ( "%s: Subscribe to %s!", gazebo_ros_->info(), command_topic_.c_str() );
 
