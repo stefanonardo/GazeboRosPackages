@@ -69,6 +69,7 @@ add_service_files(
    GetBrain.srv
    GetCSVRecordersFiles.srv
    GetPopulations.srv
+   GetSimulationCapabilities.srv
    GetSimulationState.srv
    GetStructuredTransferFunctions.srv
    GetTransferFunctions.srv
