@@ -2037,38 +2037,43 @@ void GazeboRosApiPlugin::publishModelStates()
   for (unsigned int i = 0; i < world_->GetModelCount(); i ++)
   {
     gazebo::physics::ModelPtr model = world_->GetModel(i);
-    model_states.name.push_back(model->GetName());
-    geometry_msgs::Pose pose;
-    gazebo::math::Pose  model_pose = model->GetWorldPose(); // - myBody->GetCoMPose();
-    gazebo::math::Vector3 pos = model_pose.pos;
-    gazebo::math::Quaternion rot = model_pose.rot;
-    pose.position.x = pos.x;
-    pose.position.y = pos.y;
-    pose.position.z = pos.z;
-    pose.orientation.w = rot.w;
-    pose.orientation.x = rot.x;
-    pose.orientation.y = rot.y;
-    pose.orientation.z = rot.z;
-    model_states.pose.push_back(pose);
+    // push information of the model if is not Static
+    if(!model->IsStatic())
+    {
+        model_states.name.push_back(model->GetName());
+        geometry_msgs::Pose pose;
+        gazebo::math::Pose  model_pose = model->GetWorldPose(); // - myBody->GetCoMPose();
+        gazebo::math::Vector3 pos = model_pose.pos;
+        gazebo::math::Quaternion rot = model_pose.rot;
+        pose.position.x = pos.x;
+        pose.position.y = pos.y;
+        pose.position.z = pos.z;
+        pose.orientation.w = rot.w;
+        pose.orientation.x = rot.x;
+        pose.orientation.y = rot.y;
+        pose.orientation.z = rot.z;
+        model_states.pose.push_back(pose);
 
-    geometry_msgs::Vector3 scaleMsg;
-    ignition::math::Vector3d scale = model->Scale();
-    scaleMsg.x = scale.X();
-    scaleMsg.y = scale.Y();
-    scaleMsg.z = scale.Z();
-    model_states.scale.push_back(scaleMsg);
+        geometry_msgs::Vector3 scaleMsg;
+        ignition::math::Vector3d scale = model->Scale();
+        scaleMsg.x = scale.X();
+        scaleMsg.y = scale.Y();
+        scaleMsg.z = scale.Z();
+        model_states.scale.push_back(scaleMsg);
 
-    gazebo::math::Vector3 linear_vel  = model->GetWorldLinearVel();
-    gazebo::math::Vector3 angular_vel = model->GetWorldAngularVel();
-    geometry_msgs::Twist twist;
-    twist.linear.x = linear_vel.x;
-    twist.linear.y = linear_vel.y;
-    twist.linear.z = linear_vel.z;
-    twist.angular.x = angular_vel.x;
-    twist.angular.y = angular_vel.y;
-    twist.angular.z = angular_vel.z;
-    model_states.twist.push_back(twist);
+        gazebo::math::Vector3 linear_vel  = model->GetWorldLinearVel();
+        gazebo::math::Vector3 angular_vel = model->GetWorldAngularVel();
+        geometry_msgs::Twist twist;
+        twist.linear.x = linear_vel.x;
+        twist.linear.y = linear_vel.y;
+        twist.linear.z = linear_vel.z;
+        twist.angular.x = angular_vel.x;
+        twist.angular.y = angular_vel.y;
+        twist.angular.z = angular_vel.z;
+        model_states.twist.push_back(twist);
+    }
   }
+
   pub_model_states_.publish(model_states);
 }
 
