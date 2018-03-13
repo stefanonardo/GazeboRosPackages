@@ -212,24 +212,33 @@ namespace gazebo
         string posName = this->model->GetName() + "/" + it->second->GetName() + "/pos";
         ros::Subscriber subTemp = nh.subscribe<std_msgs::Float64>(posName, 1, boost::bind(&ROSController_iCub::callbackpos, this, _1, it->first));
         posSubscriber.push_back(subTemp);
+        this->model->SaveControllerActuatorRosTopics(posName);
+
         string velName = this->model->GetName() + "/" + it->second->GetName() + "/vel";
         ros::Subscriber subTemp2 = nh.subscribe<std_msgs::Float64>(velName, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, it->first));
         velSubscriber.push_back(subTemp2);
+        this->model->SaveControllerActuatorRosTopics(velName);
       }
       //eye version
       string posNameVs = this->model->GetName() + "/" + "eye_version" + "/pos";
       ros::Subscriber subTempVsPos = nh.subscribe<std_msgs::Float64>(posNameVs, 1, boost::bind(&ROSController_iCub::callbackpos, this, _1, this->model->GetName() + "::eye_version"));
       posSubscriber.push_back(subTempVsPos);
+      this->model->SaveControllerActuatorRosTopics(posNameVs);
+
       string velNameVs = this->model->GetName() + "/" + "eye_version" + "/vel";
       ros::Subscriber subTempVsVel = nh.subscribe<std_msgs::Float64>(velNameVs, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, this->model->GetName() + "::eye_version"));
       velSubscriber.push_back(subTempVsVel);
+      this->model->SaveControllerActuatorRosTopics(velNameVs);
       //eye vergence
       string posNameVg = this->model->GetName() + "/" + "eye_vergence" + "/pos";
       ros::Subscriber subTempVgPos = nh.subscribe<std_msgs::Float64>(posNameVg, 1, boost::bind(&ROSController_iCub::callbackpos, this, _1, this->model->GetName() + "::eye_vergence"));
       posSubscriber.push_back(subTempVgPos);
+      this->model->SaveControllerActuatorRosTopics(posNameVg);
+
       string velNameVg = this->model->GetName() + "/" + "eye_vergence" + "/vel";
       ros::Subscriber subTempVgVel = nh.subscribe<std_msgs::Float64>(velNameVg, 1, boost::bind(&ROSController_iCub::callbackvel, this, _1, this->model->GetName() + "::eye_vergence"));
       velSubscriber.push_back(subTempVgVel);
+      this->model->SaveControllerActuatorRosTopics(velNameVg);
 
       cout << "[ROS CONTROLLER] subscribers initialized" << endl;
 

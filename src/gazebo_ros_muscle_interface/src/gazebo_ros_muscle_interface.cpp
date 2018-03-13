@@ -43,6 +43,8 @@ void MuscleInterfacePlugin::Init()
     // generate topic name using the model name as prefix
     std::string topic_name = m_model->GetName() + "/" + name + "/cmd_activation";
 
+    this->m_model->SaveControllerActuatorRosTopics(topic_name);
+
     // Add ROS topic for activation control
     m_activation_sub_vec.push_back(
       rosNode->subscribe<std_msgs::Float64>(

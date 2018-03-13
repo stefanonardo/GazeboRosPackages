@@ -313,6 +313,8 @@ namespace gazebo {
           boost::bind(&GazeboRosSkidSteerDrive::cmdVelCallback, this, _1),
           ros::VoidPtr(), &queue_);
 
+    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_);
+
     cmd_vel_subscriber_ = rosnode_->subscribe(so);
 
     odometry_publisher_ = rosnode_->advertise<nav_msgs::Odometry>(odometry_topic_, 1);

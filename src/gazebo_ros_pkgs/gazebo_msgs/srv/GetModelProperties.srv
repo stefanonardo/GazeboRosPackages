@@ -10,7 +10,6 @@ string[] sensor_names		     # list of sensor names
 string[] sensor_types                # list of sensor types
 string[] camera_names                # list of camera names
 string[] rostopic_camera_urls        # list of rostopic sensor URls
-string[] actuators                   # list of actuators
 string[] rostopic_actuator_urls      # list of actuator ROS topics
 bool is_static                       # returns true if model is static
 bool success                         # return true if get successful

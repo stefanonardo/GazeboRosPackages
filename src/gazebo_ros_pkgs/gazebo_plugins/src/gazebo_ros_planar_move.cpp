@@ -142,6 +142,8 @@ namespace gazebo
           boost::bind(&GazeboRosPlanarMove::cmdVelCallback, this, _1),
           ros::VoidPtr(), &queue_);
 
+    this->parent_->SaveControllerActuatorRosTopics(parent_->GetName() + "/" + command_topic_);
+
     vel_sub_ = rosnode_->subscribe(so);
     odometry_pub_ = rosnode_->advertise<nav_msgs::Odometry>(odometry_topic_, 1);
 
