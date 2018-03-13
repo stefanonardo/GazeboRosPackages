@@ -142,7 +142,7 @@ void MuscleInterfacePlugin::FillStateMessage()
   for (int muscle_idx = 0; muscle_idx < muscles.size(); ++muscle_idx)
   {
     MuscleState &state_msg = msg.muscles[muscle_idx];
-    const physics::OpensimMuscle& muscle = *muscles[muscle_idx];
+    const auto& muscle = *muscles[muscle_idx];
 
     state_msg.name = muscle.GetName();
     state_msg.force = muscle.GetForce();
