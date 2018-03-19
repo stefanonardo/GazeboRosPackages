@@ -8,4 +8,5 @@ string timeout                    # a date time when the simulation will timeout
 string playback_path              # path to simulation recording to play (if any)
 string token                      # the token of the request to use for storage access
 string ctx_id                     # the ctx_id if collab based simulation
+string experiment_id              # the experiment_id of the simulation needed to save files in the storage
 ---
