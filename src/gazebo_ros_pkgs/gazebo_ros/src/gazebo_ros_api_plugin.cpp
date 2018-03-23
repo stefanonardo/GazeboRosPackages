@@ -958,28 +958,32 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
     for (unsigned int i=0; i< sensor_types_names.size(); i++)
     {
         res.sensor_types.push_back(sensor_types_names[i]);
-    }
+    }    
 
     // get list of camera RosTopics
     res.camera_names.clear();
     res.rostopic_camera_urls.clear();
+    res.sensor_ros_message_type.clear();
 
-    std::map<std::string,std::string> rostopicsensors = model->GetSensorRosTopics();
+    std::map<std::string,std::tuple<std::string, std::string>> rostopicsensors = model->GetSensorRosTopics();
 
-    for (std::map<std::string,std::string>::iterator it = rostopicsensors.begin(); it != rostopicsensors.end(); it++ )
+    for (std::map<std::string,std::tuple<std::string, std::string>>::iterator it = rostopicsensors.begin(); it != rostopicsensors.end(); it++ )
     {
         res.camera_names.push_back(it->first);
-        res.rostopic_camera_urls.push_back(it->second);
+        res.rostopic_camera_urls.push_back(std::get<0>(it->second));
+        res.sensor_ros_message_type.push_back(std::get<1>(it->second));
     }
 
     // get a list of Actuator Rostopics
     res.rostopic_actuator_urls.clear();
+    res.actuator_ros_message_type.clear();
 
     auto rostopic_actuator = model->GetActuatorRosTopics();
 
-    for (unsigned int i=0; i< rostopic_actuator.size(); i++)
+    for (auto it = rostopic_actuator.begin(); it != rostopic_actuator.end(); it++)
     {
-        res.rostopic_actuator_urls.push_back(rostopic_actuator[i]);
+        res.rostopic_actuator_urls.push_back(it->first);
+        res.actuator_ros_message_type.push_back(it->second);
     }
 
     // is model static

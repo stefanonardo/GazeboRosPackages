@@ -205,7 +205,7 @@ void AvatarControlPlugin::CreateControllerModelRotation(const sdf::ElementPtr &s
 {
   std::string topic_name = model_->GetName() + "/cmd_rot";
 
-  model_->SaveControllerActuatorRosTopics(topic_name);
+  model_->SaveControllerActuatorRosTopics(topic_name, "geometry_msgs/Quaternion");
 
   // Add ROS topic for velocity control
   subscribers_model_rotation_.push_back(
@@ -250,7 +250,7 @@ void AvatarControlPlugin::CreateControllerLinkPose(const sdf::ElementPtr &sdf_el
   }
   std::string topic_name = model_->GetName() + "/" + link_name + "/cmd_pose";
 
-  model_->SaveControllerActuatorRosTopics(topic_name);
+  model_->SaveControllerActuatorRosTopics(topic_name, "geometry_msgs/Pose");
 
   // Add ROS topic for velocity control
   subscribers_link_pose_.push_back(
@@ -295,7 +295,7 @@ void AvatarControlPlugin::CreateControllerLinkLinearVelocity(const sdf::ElementP
   }
   std::string topic_name = model_->GetName() + "/" + link_name + "/cmd_vel";
 
-  model_->SaveControllerActuatorRosTopics(topic_name);
+  model_->SaveControllerActuatorRosTopics(topic_name, "geometry_msgs/Vector3");
 
   // Add ROS topic for velocity control
     subscribers_link_linear_velocity_.push_back(

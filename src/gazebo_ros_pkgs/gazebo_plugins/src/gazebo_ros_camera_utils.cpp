@@ -323,7 +323,7 @@ void GazeboRosCameraUtils::LoadThread()
   physics::ModelPtr parent_model = this->world_->GetModel(GetModelName(this->parentSensor_));
 
   // Call RosTopicNames
-  parent_model->SaveSensorRosTopicNames(this->camera_name_.c_str() ,rostopic);
+  parent_model->SaveSensorRosTopicNames(this->camera_name_.c_str(), rostopic, "sensor_msgs/Image");
 
   this->image_pub_ = this->itnode_->advertise(
     this->image_topic_name_, 2,

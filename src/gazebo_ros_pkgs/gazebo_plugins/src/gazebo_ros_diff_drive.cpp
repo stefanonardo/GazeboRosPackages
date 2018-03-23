@@ -166,7 +166,7 @@ void GazeboRosDiffDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _sdf 
 
     cmd_vel_subscriber_ = gazebo_ros_->node()->subscribe(so);
 
-    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_);
+    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_, "geometry_msgs/Twist");
 
     ROS_INFO("%s: Subscribe to %s!", gazebo_ros_->info(), command_topic_.c_str());
 

@@ -170,8 +170,8 @@ void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   cmd_vel_sub_ = rosnode_->subscribe("husky/cmd_vel", 1, &HuskyPlugin::OnCmdVel, this );
   wheel_speeds_sub_ = rosnode_->subscribe("husky/wheel_speeds", 1, &HuskyPlugin::OnWheelSpeeds, this);
 
-  model_->SaveControllerActuatorRosTopics("husky/cmd_vel");
-  model_->SaveControllerActuatorRosTopics("husky/wheel_speeds");
+  model_->SaveControllerActuatorRosTopics("husky/cmd_vel", "geometry_msgs/Twist");
+  model_->SaveControllerActuatorRosTopics("husky/wheel_speeds", "gazebo_msgs/WheelSpeeds");
 
   odom_pub_ = rosnode_->advertise<nav_msgs::Odometry>("odom", 1);
 

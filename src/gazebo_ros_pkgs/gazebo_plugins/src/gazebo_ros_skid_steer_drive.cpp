@@ -313,7 +313,7 @@ namespace gazebo {
           boost::bind(&GazeboRosSkidSteerDrive::cmdVelCallback, this, _1),
           ros::VoidPtr(), &queue_);
 
-    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_);
+    this->parent->SaveControllerActuatorRosTopics(parent->GetName() + "/" + command_topic_, "geometry_msgs/Twist");
 
     cmd_vel_subscriber_ = rosnode_->subscribe(so);
 
