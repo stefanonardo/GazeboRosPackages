@@ -112,7 +112,6 @@ void GazeboRosLaser::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf)
   // ros callback queue for processing subscription
   this->deferred_load_thread_ = boost::thread(
     boost::bind(&GazeboRosLaser::LoadThread, this));
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +152,12 @@ void GazeboRosLaser::LoadThread()
 
   // sensor generation off by default
   this->parent_ray_sensor_->SetActive(false);
+
+  // Save Rostopic Information
+  physics::ModelPtr parent_model = world_->GetModel(GetModelName(parent_ray_sensor_));
+
+  parent_model->SaveSensorRosTopicNames(parent_ray_sensor_->ScopedName(), topic_name_, "sensor_msgs/LaserScan");
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////

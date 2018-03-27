@@ -209,7 +209,10 @@ void GazeboRosRange::LoadThread()
     this->pub_ = this->rosnode_->advertise(ao);
   }
 
+  physics::ModelPtr parent_model = this->world_->GetModel(GetModelName(this->parent_sensor_));
 
+  // Call RosTopicNames
+  parent_model->SaveSensorRosTopicNames(this->parent_sensor_->ScopedName(), topic_name_, "sensor_msgs/Range");
   // Initialize the controller
 
   // sensor generation off by default

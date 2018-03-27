@@ -961,16 +961,16 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
     }    
 
     // get list of camera RosTopics
-    res.camera_names.clear();
-    res.rostopic_camera_urls.clear();
+    res.sensor_names_ROS.clear();
+    res.rostopic_sensor_urls.clear();
     res.sensor_ros_message_type.clear();
 
     std::map<std::string,std::tuple<std::string, std::string>> rostopicsensors = model->GetSensorRosTopics();
 
     for (std::map<std::string,std::tuple<std::string, std::string>>::iterator it = rostopicsensors.begin(); it != rostopicsensors.end(); it++ )
     {
-        res.camera_names.push_back(it->first);
-        res.rostopic_camera_urls.push_back(std::get<0>(it->second));
+        res.sensor_names_ROS.push_back(it->first);
+        res.rostopic_sensor_urls.push_back(std::get<0>(it->second));
         res.sensor_ros_message_type.push_back(std::get<1>(it->second));
     }
 
