@@ -79,6 +79,7 @@ add_service_files(
    ResetSimulation.srv
    SetBrain.srv
    SetStructuredTransferFunction.srv
+   ConvertTransferFunctionRawToStructured.srv
    AddTransferFunction.srv
    EditTransferFunction.srv
    ActivateTransferFunction.srv
