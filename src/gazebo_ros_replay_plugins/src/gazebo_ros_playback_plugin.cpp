@@ -328,15 +328,20 @@ bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index)
       this->_world->RemoveModel(model->GetName());
 
     // check if the model SDF has changed
-    else if(model->UnscaledSDF()->ToString("") !=
-            objects[model->GetName()]->ToString(""))
+    else
     {
-      // do a strange update sandwich otherwise fillmsg will except or fail to publish
-      // using model/modify causes a crash/race condition as well
-      model->UpdateParameters(objects[model->GetName()]);
-      gazebo::msgs::Model msg;
-      model->FillMsg(msg);
-      model->UpdateParameters(objects[model->GetName()]);
+      if(model->UnscaledSDF(false)->ToString("") !=
+              objects[model->GetName()]->ToString(""))
+      {
+        // do a strange update sandwich otherwise fillmsg will except or fail to publish
+        // using model/modify causes a crash/race condition as well
+        model->UpdateParameters(objects[model->GetName()]);
+        gazebo::msgs::Model msg;
+        model->FillMsg(msg);
+        model->UpdateParameters(objects[model->GetName()]);
+      }
+
+      model->UnscaledSDF(true);
     }
   }
 
