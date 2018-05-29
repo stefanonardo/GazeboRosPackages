@@ -26,6 +26,7 @@
 #include <gazebo/rendering/Scene.hh>
 #include <gazebo_ros/gazebo_ros_api_plugin.h>
 #include <gazebo/msgs/msgs.hh>
+#include <gazebo/physics/Base.hh>
 
 namespace gazebo
 {
@@ -1028,8 +1029,32 @@ bool GazeboRosApiPlugin::getJointProperties(gazebo_msgs::GetJointProperties::Req
   }
   else
   {
-    /// @todo: FIXME
-    res.type = res.REVOLUTE;
+    if (joint->HasType(gazebo::physics::Base::HINGE_JOINT))
+    {
+      res.type = res.REVOLUTE;
+    }
+    else if (joint->HasType(gazebo::physics::Base::BALL_JOINT))
+    {
+      res.type = res.BALL;
+    }
+    else if (joint->HasType(gazebo::physics::Base::SLIDER_JOINT))
+    {
+      res.type = res.PRISMATIC;
+    }
+    else if (joint->HasType(gazebo::physics::Base::UNIVERSAL_JOINT))
+    {
+      res.type = res.UNIVERSAL;
+    }
+    else if (joint->HasType(gazebo::physics::Base::FIXED_JOINT))
+    {
+      res.type = res.FIXED;
+    }
+    else
+    {
+      res.success = false;
+      res.status_message = "GetJointProperties: joint type not supported";
+      return true;
+    }
 
     res.damping.clear(); // to be added to gazebo
     //res.damping.push_back(joint->GetDamping(0));
