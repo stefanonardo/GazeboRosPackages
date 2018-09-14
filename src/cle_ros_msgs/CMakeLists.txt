@@ -58,6 +58,8 @@ add_message_files(
    TransferFunction.msg
    Topic.msg
    Variable.msg
+   # Robot related
+   RobotInfo.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -87,6 +89,9 @@ add_service_files(
    ExtendTimeout.srv
    SimulationRecorder.srv
    SimulationPlayback.srv
+   # Robot related
+   GetRobots.srv
+   AddRobot.srv
 )
 
 ## Generate actions in the 'action' folder
