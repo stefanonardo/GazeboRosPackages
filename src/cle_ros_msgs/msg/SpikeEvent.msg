@@ -4,3 +4,4 @@ float32 simulationTime
 int32 neuronCount
 cle_ros_msgs/SpikeData[] spikes
 string monitorName
+string populationLabel
