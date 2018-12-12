@@ -8,7 +8,7 @@ image: hbpneurorobotics/nrp:dev
 pipelines:
   branches:
     development:
-      - step:
+    - step:
         name: Build
         script: # Modify the commands below to build your repository.
           - rm -rf build && catkin_make
