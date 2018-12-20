@@ -932,7 +932,7 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
 
     gazebo::physics::Joint_V joints = model->GetJoints();
     for (unsigned int i=0;i< joints.size(); i++)
-      res.joint_names.push_back( joints[i]->GetName() );
+      res.joint_names.push_back( joints[i]->GetScopedName() );
 
     // get children model names
     res.child_model_names.clear();
@@ -971,7 +971,7 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
     for (std::map<std::string,std::tuple<std::string, std::string>>::iterator it = rostopicsensors.begin(); it != rostopicsensors.end(); it++ )
     {
         res.sensor_names_ROS.push_back(it->first);
-        res.rostopic_sensor_urls.push_back(std::get<0>(it->second));
+        res.rostopic_sensor_urls.push_back(model->GetName() + "/" + std::get<0>(it->second));
         res.sensor_ros_message_type.push_back(std::get<1>(it->second));
     }
 
@@ -983,7 +983,7 @@ bool GazeboRosApiPlugin::getModelProperties(gazebo_msgs::GetModelProperties::Req
 
     for (auto it = rostopic_actuator.begin(); it != rostopic_actuator.end(); it++)
     {
-        res.rostopic_actuator_urls.push_back(it->first);
+        res.rostopic_actuator_urls.push_back(model->GetName() + "/" + it->first);
         res.actuator_ros_message_type.push_back(it->second);
     }
 
