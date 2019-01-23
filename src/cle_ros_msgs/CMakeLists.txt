@@ -101,6 +101,9 @@ add_service_files(
    GetRobots.srv
    AddRobot.srv
    DeleteRobot.srv
+
+   # Resource handling
+   Resource.srv
 )
 
 ## Generate actions in the 'action' folder
