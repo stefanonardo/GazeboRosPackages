@@ -120,7 +120,7 @@ namespace gazebo
 
     /// \brief tf prefix
     private: std::string tf_prefix_;
-    
+
     /// \brief ROS image topic name
     protected: std::string image_topic_name_;
 
@@ -172,8 +172,8 @@ namespace gazebo
     // Time last published, refrain from publish unless new image has
     // been rendered
     // Allow dynamic reconfiguration of camera params
-    dynamic_reconfigure::Server<gazebo_plugins::GazeboRosCameraConfig>
-      *dyn_srv_;
+    private: dynamic_reconfigure::Server<gazebo_plugins::GazeboRosCameraConfig> *dyn_srv_ = nullptr;
+    
     void configCallback(gazebo_plugins::GazeboRosCameraConfig &config,
       uint32_t level);
 
