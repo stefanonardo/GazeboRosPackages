@@ -137,7 +137,10 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
 
   // Listen to the update event. This event is broadcast every simulation iteration.
   m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
-  this->m_joint_state_pub = m_nh.advertise<sensor_msgs::JointState>( "joint_states", 10 );
+
+  const std::string joint_states_topic_name = m_model->GetName() + "/" + "joint_states";
+
+  this->m_joint_state_pub = m_nh.advertise<sensor_msgs::JointState>( joint_states_topic_name, 10 );
 
   m_setPIDParameterService = m_nh.advertiseService<
     SetPIDParameters::Request,
@@ -152,7 +155,6 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
     JointProperties::Response>(
       m_model->GetName() + "/joint_properties",
       boost::bind(&GenericControlPlugin::getJointPropertiesCB, this, _1, _2)
-      
   );
 
   m_ja.layout.dim.resize(1);
@@ -160,7 +162,10 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   m_ja.layout.dim[0].size  = numJoints;
   m_ja.layout.dim[0].stride = 1;
   m_ja.data.resize(numJoints);
-  this->m_joint_accel_pub = m_nh.advertise<std_msgs::Float32MultiArray>( "joint_accel", 10 );
+
+  const std::string joint_accel_topic_name = m_model->GetName() + "/" + "joint_accel";
+
+  this->m_joint_accel_pub = m_nh.advertise<std_msgs::Float32MultiArray>( joint_accel_topic_name, 10 );
 }
 
 // Called by the world update start event
@@ -385,7 +390,7 @@ bool GenericControlPlugin::setPIDParametersCB(SetPIDParameters::Request &req,
   }
   else
   {
-    // We set same parameters for positin and velocity PID. That is because
+    // We set same parameters for position and velocity PID. That is because
     // we do not know which kind of controller is used. At the time of this
     // writing this just puts the parameters in a map of the controller manager.
     // Parameters are obtained from there when the force is calculated.
