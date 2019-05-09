@@ -34,7 +34,6 @@ GZ_REGISTER_MODEL_PLUGIN(ConveyorBeltPlugin)
 /////////////////////////////////////////////////
 ConveyorBeltPlugin::~ConveyorBeltPlugin()
 {
-  event::Events::DisconnectWorldUpdateBegin(this->updateConnection);
 }
 
 /////////////////////////////////////////////////
