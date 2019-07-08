@@ -4,6 +4,7 @@ int32 severity # error severity according to the following constants
 int32 SEVERITY_WARNING=0  # The error might not affect the simulation at all
 int32 SEVERITY_ERROR=1    # The error will lead to a simulation failure if not resolved
 int32 SEVERITY_CRITICAL=2 # The error has lead to simulation failure
+int32 SEVERITY_MAJOR = 3 # The error has lead to stop the simulation and show a message in the frontend
 
 string sourceType # e.g., "Transfer Function"
 string SOURCE_TYPE_TRANSFER_FUNCTION=Transfer Function
