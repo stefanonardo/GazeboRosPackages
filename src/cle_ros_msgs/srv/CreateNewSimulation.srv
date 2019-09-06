@@ -1,4 +1,3 @@
-string environment_file           # path of the Gazebo World file to be loaded
 string exd_config_file            # path of experiment configuration file
 string gzserver_host              # host type 'local' or 'lugano'
 string reservation                # name of a reservation on the vizcluster, e.g., "sp10-user-workshop"
