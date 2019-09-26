@@ -3,21 +3,33 @@
 
 namespace gazebo
 {
+	TigrilloPlugin::TigrilloPlugin()
+	{
+		kill_sim_ = false;
+		this->spinner_thread_ = new std::thread(&TigrilloPlugin::spin, this);
+	}
+
+	TigrilloPlugin::~TigrilloPlugin()
+	{
+		event::Events::DisconnectWorldUpdateBegin(this->UpdateConnection);
+		
+		this->ros_node->shutdown();
+		kill_sim_ = true;
+		this->spinner_thread_->join();
+		delete this->spinner_thread_;
+	}
 
 	void TigrilloPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
 	{
-
 		ROS_INFO("Loading Tigrillo Plugin");
 		ROS_INFO_STREAM("Gazebo is using the physics engine: " <<
 		_model->GetWorld()->GetPhysicsEngine()->GetType());
 
 		// Set Timer parameters
-		int freq = 10;
-		if (_sdf->HasElement("freq")) {
-			freq = _sdf->Get<double>("freq");
+		delay_s_ = 1.0 / 10.0;
+		if (_sdf->HasElement("freq") && _sdf->Get<double>("freq") > 0) {
+			delay_s_ = 1.0 / _sdf->Get<double>("freq");
 		}
-		this->pub_freq = freq;
-		ROS_INFO_STREAM("Sensor Publication frequency on ROS has been set to: " << this->pub_freq << " Hz");
 
 		// Set PID parameters
 		double p = 5;
@@ -95,6 +107,11 @@ namespace gazebo
 		float position[4] = {0, 0, 0, 0};
 		this->SetPositionTarget(position);
 
+		// Listen to the update event. This event is broadcast every
+		// simulation iteration.
+		this->UpdateConnection = event::Events::ConnectWorldUpdateBegin(
+			boost::bind(&TigrilloPlugin::OnUpdate, this));
+
 		// Initialize ROS
 		this->RosInit();
 	}
@@ -168,128 +185,89 @@ namespace gazebo
 		this->SetPositionTarget(position);
 	}
 
-	
-	void TigrilloPlugin::SendRosMsgSenThread()
-	{
-		while (this->ros_node->ok())
-		{
-			// Get sensors values
-			float sensors[4];
-			this->GetSensors(sensors);
-
-   			// Send over ROS
-   			tigrillo_2_plugin::Sensors msg;
-   			msg.FL = sensors[0];
-   			msg.FR = sensors[1];
-   			msg.BL = sensors[2];
-   			msg.BR = sensors[3];
-   			msg.run_time = this->model->GetWorld()->GetSimTime().Double() ;
-   			// ROS_DEBUG_STREAM("Publishing sensors: FL: " << msg.FL << " FR: " << 
-   			// 	msg.FR << " BL: " << msg.BL << " BR: " << msg.BR );
-			this->ros_pub_s.publish(msg);
-
-			// Wait till next time
-			ros::spinOnce();
-			this->pub_rate->sleep();
-		}
-	}
-
-	void TigrilloPlugin::SendRosMsgMotThread()
-	{
-		while (this->ros_node->ok())
-		{
-			// Get sensors values
-			float motors[4];
-			this->GetMotors(motors);
-
-   			// Send over ROS
-   			tigrillo_2_plugin::Motors msg;
-   			msg.FL = motors[0];
-   			msg.FR = motors[1];
-   			msg.BL = motors[2];
-   			msg.BR = motors[3];
-   			msg.run_time = this->model->GetWorld()->GetSimTime().Double() ;
-   			// ROS_DEBUG_STREAM("Publishing motors: FL: " << msg.FL << " FR: " << 
-   			// 	msg.FR << " BL: " << msg.BL << " BR: " << msg.BR );
-			this->ros_pub_m.publish(msg);
-
-			// Wait till next time
-			ros::spinOnce();
-			this->pub_rate->sleep();
-		}
-	}
-
-
 	void TigrilloPlugin::RosInit()
 	{
-		
-		
-			// Initialize ros, if it has not already bee initialized.
-			if (!ros::isInitialized())
-			{
+		// Initialize ros, if it has not already been initialized.
+		if (!ros::isInitialized())
+		{
 
-			ROS_INFO_STREAM("Create ROS Node: /" << this->ros_node_name);
-				int argc = 0;
-				char **argv = NULL;
-				ros::init(argc, argv, this->ros_node_name,
-					ros::init_options::NoSigintHandler);
-			}
+		ROS_INFO_STREAM("Create ROS Node: /" << this->ros_node_name);
+			int argc = 0;
+			char **argv = NULL;
+			ros::init(argc, argv, this->ros_node_name,
+				ros::init_options::NoSigintHandler);
+		}
 
-			// Create our ROS node. This acts in a similar manner to
-			// the Gazebo node
-			this->ros_node.reset(new ros::NodeHandle(this->ros_node_name));
+		// Create our ROS node. This acts in a similar manner to
+		// the Gazebo node
+		this->ros_node.reset(new ros::NodeHandle(this->ros_node_name));
 
-			// Create a named topic, and subscribe to it
-			ROS_INFO_STREAM("Subscribe to topic: " + this->ros_node_name + "/" + this->ros_sub_name);
-			ros::SubscribeOptions so =
-			ros::SubscribeOptions::create<tigrillo_2_plugin::Motors>(
-				this->ros_sub_name,
-				1,
-				boost::bind(&TigrilloPlugin::OnRosMsg, this, _1),
-				ros::VoidPtr(), &this->ros_queue);
-			this->ros_sub = this->ros_node->subscribe(so);
+		// Create a named topic, and subscribe to it
+		ROS_INFO_STREAM("Subscribe to topic: " + this->ros_node_name + "/" + this->ros_sub_name);
+		this->ros_sub = this->ros_node->subscribe(this->ros_sub_name, 1, &TigrilloPlugin::OnRosMsg, this);
 
-			// Advertise topics for NRP
-			this->model->SaveControllerActuatorRosTopics(this->ros_node_name + "/" + this->ros_sub_name, "tigrillo_2_plugin/Motors");
-			this->model->SaveSensorRosTopicNames("", this->ros_node_name + "/" + this->ros_pub_name_s, "tigrillo_2_plugin/Sensors");
-			this->model->SaveSensorRosTopicNames("", this->ros_node_name + "/" + this->ros_pub_name_m, "tigrillo_2_plugin/Motors");
+		// Advertise topics for NRP
+		this->model->SaveControllerActuatorRosTopics(this->ros_node_name + "/" + this->ros_sub_name, "tigrillo_2_plugin/Motors");
+		this->model->SaveSensorRosTopicNames("", this->ros_node_name + "/" + this->ros_pub_name_s, "tigrillo_2_plugin/Sensors");
+		this->model->SaveSensorRosTopicNames("", this->ros_node_name + "/" + this->ros_pub_name_m, "tigrillo_2_plugin/Motors");
 
-			// Create a named topic for publication
-			ROS_INFO_STREAM("Publish sensors in topic: " + this->ros_node_name + "/" + this->ros_pub_name_s);
-			this->ros_pub_s = 
-				this->ros_node->advertise<tigrillo_2_plugin::Sensors>(this->ros_pub_name_s, 1);
+		// Create a named topic for publication
+		ROS_INFO_STREAM("Publish sensors in topic: " + this->ros_node_name + "/" + this->ros_pub_name_s);
+		this->ros_pub_s = 
+			this->ros_node->advertise<tigrillo_2_plugin::Sensors>(this->ros_pub_name_s, 1);
 
-			// Create a named topic for publication
-			ROS_INFO_STREAM("Publish motors in topic: " + this->ros_node_name + "/" + this->ros_pub_name_m);
-			this->ros_pub_m = 
-				this->ros_node->advertise<tigrillo_2_plugin::Motors>(this->ros_pub_name_m, 1);
-
-			// Create a timer for publication
-			this->pub_rate.reset(new ros::Rate(this->pub_freq));
-
-			// Spin up the queue helper thread.
-			this->ros_queue_thread =
-				std::thread(std::bind(&TigrilloPlugin::QueueThread, this));
-
-			// Publish the sensors on ROS in a thread loop
-			this->ros_sen_thread =
-				std::thread(std::bind(&TigrilloPlugin::SendRosMsgSenThread, this));
-
-			// Publish the sensors on ROS in a thread loop
-			this->ros_mot_thread =
-				std::thread(std::bind(&TigrilloPlugin::SendRosMsgMotThread, this));
+		// Create a named topic for publication
+		ROS_INFO_STREAM("Publish motors in topic: " + this->ros_node_name + "/" + this->ros_pub_name_m);
+		this->ros_pub_m = 
+			this->ros_node->advertise<tigrillo_2_plugin::Motors>(this->ros_pub_name_m, 1);
 	}
 	
-
-	void TigrilloPlugin::QueueThread()
+	void TigrilloPlugin::OnUpdate()
 	{
-		static const double timeout = 0.01;
-		while (this->ros_node->ok())
+		double current_time = this->model->GetWorld()->GetSimTime().Double();
+		
+		if (current_time - last_on_update_time_ < delay_s_)
 		{
-			this->ros_queue.callAvailable(ros::WallDuration(timeout));
+			return;
 		}
+
+		last_on_update_time_ = current_time;
+
+		// Sensors
+		float sensors[4];
+		this->GetSensors(sensors);
+		// Send over ROS
+		tigrillo_2_plugin::Sensors sensorsMsg;
+		sensorsMsg.FL = sensors[0];
+		sensorsMsg.FR = sensors[1];
+		sensorsMsg.BL = sensors[2];
+		sensorsMsg.BR = sensors[3];
+		sensorsMsg.run_time = this->model->GetWorld()->GetSimTime().Double();
+		// ROS_DEBUG_STREAM("Publishing sensors: FL: " << sensorsMsg.FL << " FR: " << 
+		// 	sensorsMsg.FR << " BL: " << sensorsMsg.BL << " BR: " << sensorsMsg.BR );
+		this->ros_pub_s.publish(sensorsMsg);
+
+		// Motors
+		// Get sensors values
+		float motors[4];
+		this->GetMotors(motors);
+		// Send over ROS
+		tigrillo_2_plugin::Motors motorsMsg;
+		motorsMsg.FL = motors[0];
+		motorsMsg.FR = motors[1];
+		motorsMsg.BL = motors[2];
+		motorsMsg.BR = motors[3];
+		motorsMsg.run_time = this->model->GetWorld()->GetSimTime().Double();
+		// ROS_DEBUG_STREAM("Publishing motors: FL: " << msg.FL << " FR: " << 
+		// 	msg.FR << " BL: " << msg.BL << " BR: " << msg.BR );
+		this->ros_pub_m.publish(motorsMsg);
+
 	}
 
+	void TigrilloPlugin::spin()
+	{
+		while(ros::ok() && !kill_sim_) ros::spinOnce();
+	}
 	// Tell Gazebo about this plugin, so that Gazebo can call Load on this plugin.
 	GZ_REGISTER_MODEL_PLUGIN(TigrilloPlugin);
 }

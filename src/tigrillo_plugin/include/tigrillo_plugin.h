@@ -82,7 +82,8 @@ namespace gazebo
     private: float knee_angle = 33.80731;
 
     /// \brief Constructor
-    public: TigrilloPlugin() {}
+    public: TigrilloPlugin();
+            virtual ~TigrilloPlugin();
     
     /// \brief A node use for ROS transport and its name
     private: std::unique_ptr<ros::NodeHandle> ros_node;
@@ -97,21 +98,20 @@ namespace gazebo
     private: ros::Publisher ros_pub_s;
     private: std::string ros_pub_name_m = "sim_motors";
     private: ros::Publisher ros_pub_m;
-    private: std::unique_ptr<ros::Rate> pub_rate;
-    private: int pub_freq;
 
     /// \brief A ROS callbackqueue that helps process messages
     private: ros::CallbackQueue ros_queue;
 
-    /// \brief A thread that keep running the ros_queue
-    private: std::thread ros_queue_thread;
-
-    /// \brief A thread to publish the sensor position over ROS
-    private: std::thread ros_sen_thread;
-
-    /// \brief A thread to publish the motor position over ROS
-    private: std::thread ros_mot_thread;
-
+    // \brief Pointer to the update event connection
+    private: event::ConnectionPtr UpdateConnection;
+    
+    private: bool kill_sim_;
+    
+    private: std::thread *spinner_thread_;
+    
+    private: double delay_s_;
+    private: double last_on_update_time_;
+    
     /// \brief The load function is called by Gazebo when the plugin is
     /// inserted into simulation
     /// \param[in] _model A pointer to the model that this plugin is
@@ -136,17 +136,13 @@ namespace gazebo
     // positions
     public: void OnRosMsg(const tigrillo_2_plugin::MotorsConstPtr &_msg);
 
-    /// \brief Thread that publishes the sensor messages on ROS
-    private: void SendRosMsgSenThread();
-
-    /// \brief Thread that publishes the motor messages on ROS
-    private: void SendRosMsgMotThread();
+    // \brief Publish motors and sensors messages on world update event
+    public: void OnUpdate();
 
     /// \brief Implement ROS initialization
     private: void RosInit();
 
-    /// \brief ROS helper function that processes messages
-    private: void QueueThread();
+    private: void spin();
   };
 
 }
