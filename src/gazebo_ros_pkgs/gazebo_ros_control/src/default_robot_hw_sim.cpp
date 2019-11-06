@@ -248,12 +248,12 @@ void DefaultRobotHWSim::readSim(ros::Time time, ros::Duration period)
     // Gazebo has an interesting API...
     if (joint_types_[j] == urdf::Joint::PRISMATIC)
     {
-      joint_position_[j] = sim_joints_[j]->GetAngle(0).Radian();
+      joint_position_[j] = sim_joints_[j]->Position(0);//GetAngle(0).Radian();
     }
     else
     {
       joint_position_[j] += angles::shortest_angular_distance(joint_position_[j],
-                            sim_joints_[j]->GetAngle(0).Radian());
+                            sim_joints_[j]->Position(0));//GetAngle(0).Radian());
     }
     joint_velocity_[j] = sim_joints_[j]->GetVelocity(0);
     joint_effort_[j] = sim_joints_[j]->GetForce((unsigned int)(0));
@@ -381,7 +381,8 @@ void DefaultRobotHWSim::registerJointLimits(const std::string& joint_name,
 
   if (urdf_model != NULL)
   {
-    const boost::shared_ptr<const urdf::Joint> urdf_joint = urdf_model->getJoint(joint_name);
+    std::shared_ptr<const urdf::Joint> urdf_joint = urdf_model->getJoint(joint_name);
+    //const boost::shared_ptr<const urdf::Joint> urdf_joint = urdf_model->getJoint(joint_name);
     if (urdf_joint != NULL)
     {
       *joint_type = urdf_joint->type;

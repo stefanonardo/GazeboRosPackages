@@ -209,7 +209,7 @@ void GazeboRosRange::LoadThread()
     this->pub_ = this->rosnode_->advertise(ao);
   }
 
-  physics::ModelPtr parent_model = this->world_->GetModel(GetModelName(this->parent_sensor_));
+  physics::ModelPtr parent_model = this->world_->ModelByName(GetModelName(this->parent_sensor_));
 
   // Call RosTopicNames
   parent_model->SaveSensorRosTopicNames(this->parent_sensor_->ScopedName(), topic_name_, "sensor_msgs/Range");
@@ -246,7 +246,7 @@ void GazeboRosRange::OnNewLaserScans()
 {
   if (this->topic_name_ != "")
   {
-    common::Time cur_time = this->world_->GetSimTime();
+    common::Time cur_time = this->world_->SimTime();
     if (cur_time - this->last_update_time_ >= this->update_period_)
     {
       common::Time sensor_update_time =

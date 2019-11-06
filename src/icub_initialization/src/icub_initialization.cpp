@@ -237,7 +237,7 @@ namespace gazebo
 //       {
 //         if ("neck_pitch" == it->second->GetName())
 //             cout << it->second->GetName() << " "
-//                  << it->second->GetAngle(0).Radian() << " "
+//                  << it->second->Position() << " "
 //                  << it->second->GetVelocity(0) << " "
 //                  << it->second->GetForce(0) << endl;
 //       }

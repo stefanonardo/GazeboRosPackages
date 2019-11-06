@@ -322,7 +322,7 @@ void GazeboRosRecordingPlugin::onModelChange(const boost::shared_ptr<gazebo::msg
   auto wait_run = boost::bind(&GazeboRosRecordingPlugin::waitForChange, this, msg, nullptr);
   boost::shared_ptr<boost::thread> threadPtr;
   threadPtr.reset(new boost::thread(wait_run));
-  this->_changeThreads.push(std::make_pair(this->_world->GetSimTime(), threadPtr));
+  this->_changeThreads.push(std::make_pair(this->_world->SimTime(), threadPtr));
 }
 
 void GazeboRosRecordingPlugin::onLightChange(const boost::shared_ptr<gazebo::msgs::Light const> &msg)
@@ -339,7 +339,7 @@ void GazeboRosRecordingPlugin::onLightChange(const boost::shared_ptr<gazebo::msg
   auto wait_run = boost::bind(&GazeboRosRecordingPlugin::waitForChange, this, nullptr, msg);
   boost::shared_ptr<boost::thread> threadPtr;
   threadPtr.reset(new boost::thread(wait_run));
-  this->_changeThreads.push(std::make_pair(this->_world->GetSimTime(), threadPtr));
+  this->_changeThreads.push(std::make_pair(this->_world->SimTime(), threadPtr));
 }
 
 void GazeboRosRecordingPlugin::processChanges()
@@ -394,7 +394,7 @@ void GazeboRosRecordingPlugin::processChanges()
       if(empty)
       {
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
-        ok = this->_world->GetSimTime() < end;
+        ok = this->_world->SimTime() < end;
       }
 
       // otherwise, wait for the thread to complete (this won't hang as it is limited in the thread)
@@ -446,7 +446,7 @@ void GazeboRosRecordingPlugin::waitForChange(const boost::shared_ptr<gazebo::msg
     // wait for the model to reflect the change request
     if(modelMsg)
     {
-      auto model = this->_world->GetModel(modelMsg->name());
+      auto model = this->_world->ModelByName(modelMsg->name());
       gazebo::msgs::Model updated;
       updated.Clear();
       model->FillMsg(updated);
@@ -498,7 +498,7 @@ void GazeboRosRecordingPlugin::waitForChange(const boost::shared_ptr<gazebo::msg
         target.mutable_pose()->Clear();
 
       // get the current light state with no pose
-      auto light = this->_world->Light(lightMsg->name());
+      auto light = this->_world->LightByName(lightMsg->name());
       gazebo::msgs::Light updated;
       updated.Clear();
       light->FillMsg(updated);

@@ -94,7 +94,7 @@ HuskyPlugin::HuskyPlugin()
 
 HuskyPlugin::~HuskyPlugin()
 {
-  event::Events::DisconnectWorldUpdateBegin(this->updateConnection);
+  this->updateConnection.reset();
 
   rosnode_->shutdown();
   kill_sim = true;
@@ -211,7 +211,7 @@ void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
   if (joints_[FR]) set_joints_[FR] = true;
 
   //initialize time and odometry position
-  prev_update_time_ = last_cmd_vel_time_ = this->world_->GetSimTime();
+  prev_update_time_ = last_cmd_vel_time_ = this->world_->SimTime();
   odom_pose_[0] = 0.0;
   odom_pose_[1] = 0.0;
   odom_pose_[2] = 0.0;
@@ -220,7 +220,7 @@ void HuskyPlugin::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf )
 
 void HuskyPlugin::UpdateChild()
 {
-  common::Time time_now = this->world_->GetSimTime();
+  common::Time time_now = this->world_->SimTime();
   common::Time step_time = time_now - prev_update_time_;
   prev_update_time_ = time_now;
 
@@ -354,28 +354,28 @@ void HuskyPlugin::UpdateChild()
   js_.header.stamp.nsec = time_now.nsec;
   if (this->set_joints_[BL])
   {
-    js_.position[0] = joints_[BL]->GetAngle(0).Radian();
+    js_.position[0] = joints_[BL]->Position();
     js_.velocity[0] = joints_[BL]->GetVelocity(0);
     js_.effort[0] = joints_[BL]->GetForce(0); //GetForce not implemented yet!
   }
 
   if (this->set_joints_[BR])
   {
-    js_.position[1] = joints_[BR]->GetAngle(0).Radian();
+    js_.position[1] = joints_[BR]->Position();
     js_.velocity[1] = joints_[BR]->GetVelocity(0);
     js_.effort[1] = joints_[BR]->GetForce(0);
   }
 
   if (this->set_joints_[FL])
   {
-    js_.position[2] = joints_[FL]->GetAngle(0).Radian();
+    js_.position[2] = joints_[FL]->Position();
     js_.velocity[2] = joints_[FL]->GetVelocity(0);
     js_.effort[2] = joints_[FL]->GetForce(0);
   }
 
   if (this->set_joints_[FR])
   {
-    js_.position[3] = joints_[FR]->GetAngle(0).Radian();
+    js_.position[3] = joints_[FR]->Position();
     js_.velocity[3] = joints_[FR]->GetVelocity(0);
     js_.effort[3] = joints_[FR]->GetForce(0);
   }
@@ -396,7 +396,7 @@ void HuskyPlugin::UpdateChild()
 
 void HuskyPlugin::OnCmdVel( const geometry_msgs::TwistConstPtr &msg)
 {
-  last_cmd_vel_time_ = this->world_->GetSimTime();
+  last_cmd_vel_time_ = this->world_->SimTime();
   double vr, va;
   vr = msg->linear.x;
   va = msg->angular.z;
@@ -410,7 +410,7 @@ void HuskyPlugin::OnCmdVel( const geometry_msgs::TwistConstPtr &msg)
 
 void HuskyPlugin::OnWheelSpeeds( const gazebo_msgs::WheelSpeeds::ConstPtr &msg )
 {
-  last_cmd_vel_time_ = this->world_->GetSimTime();
+  last_cmd_vel_time_ = this->world_->SimTime();
   double back_left, back_right, front_left, front_right;
   back_left = msg->back_left_wheel;
   back_right = msg->back_right_wheel;

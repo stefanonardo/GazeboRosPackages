@@ -113,7 +113,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
         joint_axis_ros.z = joint_axis.z;
 
         this->m_joint_axis_mappings[joint->GetName()] = joint_axis_ros;
-        gazebo::math::Vector3 rotation_axis(joint_axis.x, joint_axis.y, joint_axis.z);
+        ignition::math::Vector3d rotation_axis(joint_axis.x, joint_axis.y, joint_axis.z);
         joint->SetMappedRotationAxis(rotation_axis);
 #endif
       }
@@ -125,7 +125,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   }
 
   // Controller time control.
-  this->lastControllerUpdateTime = this->m_model->GetWorld()->GetSimTime();
+  this->lastControllerUpdateTime = this->m_model->GetWorld()->SimTime();
 
   int numJoints = m_joints.size();
   m_js.header.stamp.sec = this->lastControllerUpdateTime.sec;
@@ -173,7 +173,7 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 {
   std::lock_guard<std::mutex> lock(this->mutex);
 
-  gazebo::common::Time curTime = this->m_model->GetWorld()->GetSimTime();
+  gazebo::common::Time curTime = this->m_model->GetWorld()->SimTime();
 
   if (curTime > this->lastControllerUpdateTime)
   {
@@ -185,7 +185,7 @@ void GenericControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
     {
       physics::JointPtr joint = joint_iter->second;
       m_js.name[curr_ind] = joint->GetName();
-      m_js.position[curr_ind] = joint->GetAngle(0).Radian();
+      m_js.position[curr_ind] = joint->Position();
       m_js.velocity[curr_ind] = joint->GetVelocity(0);
       m_js.effort[curr_ind] = joint->GetForce(0);
       m_ja.data[curr_ind] = joint->GetAcceleration(0);
@@ -417,8 +417,8 @@ bool GenericControlPlugin::getJointPropertiesCB(JointProperties::Request &req,
         res.joint[jointIdx] = joint->GetName();
         
         // This only gives you the limits of the first joint axis/degree of freedom!
-        res.lower_limit[jointIdx] = joint->GetLowerLimit(0).Radian();
-        res.upper_limit[jointIdx] = joint->GetUpperLimit(0).Radian();
+        res.lower_limit[jointIdx] = joint->LowerLimit(0);
+        res.upper_limit[jointIdx] = joint->UpperLimit(0);
         jointIdx++;
     }
   }

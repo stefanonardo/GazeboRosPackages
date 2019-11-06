@@ -149,7 +149,7 @@ void GazeboRosProsilica::OnNewImageFrame(const unsigned char *_image,
     {
       if ((*this->image_connect_count_) > 0)
       {
-        common::Time cur_time = this->world_->GetSimTime();
+        common::Time cur_time = this->world_->SimTime();
         if (cur_time - this->last_update_time_ >= this->update_period_)
         {
           this->PutCameraData(_image, sensor_update_time);
@@ -334,7 +334,7 @@ void GazeboRosProsilica::OnStats( const boost::shared_ptr<msgs::WorldStatistics 
 {
   this->simTime  = msgs::Convert( _msg->sim_time() );
 
-  math::Pose pose;
+  ignition::math::Pose3d pose;
   pose.pos.x = 0.5*sin(0.01*this->simTime.Double());
   gzdbg << "plugin simTime [" << this->simTime.Double() << "] update pose [" << pose.pos.x << "]\n";
 }

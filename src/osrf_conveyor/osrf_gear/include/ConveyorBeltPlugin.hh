@@ -20,7 +20,6 @@
 
 #include <gazebo/common/Event.hh>
 #include <gazebo/common/Plugin.hh>
-#include <gazebo/math/Angle.hh>
 #include <gazebo/physics/Joint.hh>
 #include <gazebo/physics/Link.hh>
 #include <gazebo/physics/Model.hh>
@@ -157,7 +156,7 @@ namespace gazebo
 
     /// \brief When the joint reaches this point, it will go back to its initial
     /// position.
-    private: math::Angle limit;
+    private: double limit;
 
     /// \brief Maximum linear velocity of the belt.
     private: const double kMaxBeltLinVel = 0.5;

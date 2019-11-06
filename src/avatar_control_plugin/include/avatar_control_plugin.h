@@ -117,9 +117,9 @@ private:
   float link_linear_velocity_speed_factor_, link_angular_velocity_speed_factor_;
   float link_pos_target_diff_threshold_, link_rot_target_diff_threshold_;
   // saves parent model rotation updates from topics (applied during OnUpdate() )
-  gazebo::math::Quaternion model_target_rotation_;
+  ignition::math::Quaterniond model_target_rotation_;
   // pose targets for links
-  std::map<physics::LinkPtr, gazebo::math::Pose> link_pose_targets_;
+  std::map<physics::LinkPtr, ignition::math::Pose3d> link_pose_targets_;
   
   // whether to keep the parent model positioned on ground
   bool keep_model_on_ground_;

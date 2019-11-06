@@ -24,8 +24,7 @@ public:
     // disconnect all listener events
     if (this->_gazeboLoadedConnection)
     {
-      event::Events::DisconnectWorldCreated(this->_gazeboLoadedConnection);
-      this->_gazeboLoadedConnection.reset();
+       this->_gazeboLoadedConnection.reset();
     }
 
     // disconnect the node handles and shutdown any advertised services/topics

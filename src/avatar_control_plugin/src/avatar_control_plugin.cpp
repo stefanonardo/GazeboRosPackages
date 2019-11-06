@@ -68,7 +68,7 @@ void AvatarControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   this->ParseControllers(sdf);
 
   // Controller time control.
-  this->last_update_time_ = this->model_->GetWorld()->GetSimTime();
+  this->last_update_time_ = this->model_->GetWorld()->SimTime();
 
   // Listen to the update event. This event is broadcast every simulation iteration.
   eventconnection_update_world_ = event::Events::ConnectWorldUpdateBegin(boost::bind(&AvatarControlPlugin::OnUpdate, this, _1));
@@ -79,17 +79,17 @@ void AvatarControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
 {
   std::lock_guard<std::mutex> lock(this->mutex_);
 
-  gazebo::common::Time curTime = this->model_->GetWorld()->GetSimTime();
+  gazebo::common::Time curTime = this->model_->GetWorld()->SimTime();
   
   // keep model on ground if set
-  math::Pose model_world_pose = this->model_->GetWorldPose();
+  ignition::math::Pose3d model_world_pose = this->model_->WorldPose();
   if (this->keep_model_on_ground_)
   {
-    gazebo::math::Vector3 up = gazebo::math::Vector3::UnitZ;
-    gazebo::math::Vector3 ground_ray_start = model_world_pose.pos + (up * this->step_height_);
-    gazebo::math::Vector3 ground_ray_end = model_world_pose.pos - (up * 100.0f);
+    ignition::math::Vector3d up = ignition::math::Vector3d::UnitZ;
+    ignition::math::Vector3d ground_ray_start = model_world_pose.Pos() + (up * this->step_height_);
+    ignition::math::Vector3d ground_ray_end = model_world_pose.Pos() - (up * 100.0f);
     
-    gazebo::physics::PhysicsEnginePtr engine = model_->GetWorld()->GetPhysicsEngine();
+    gazebo::physics::PhysicsEnginePtr engine = model_->GetWorld()->Physics();
     gazebo::physics::RayShapePtr ray = boost::dynamic_pointer_cast<gazebo::physics::RayShape>(engine->CreateShape("ray", gazebo::physics::CollisionPtr()));
     ray->SetPoints(ground_ray_start, ground_ray_end);
     
@@ -98,20 +98,20 @@ void AvatarControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
     ray->GetIntersection(distance, entity_name);
     if (!entity_name.empty())
     {
-      gazebo::math::Vector3 vec_to_ground = (ground_ray_start - (distance * up)) - model_world_pose.pos;
-      if (vec_to_ground.GetLength()  > 0.05f) {
+      ignition::math::Vector3d vec_to_ground = (ground_ray_start - (distance * up)) - model_world_pose.Pos();
+      if (vec_to_ground.Length()  > 0.05f) {
         this->model_->SetLinearVel(vec_to_ground * 30);
       }
     }
   }
   
   // set angular velocity from target model rotation (this->model_target_rotation_)
-  math::Vector3 model_angular_velocity = math::Vector3::Zero;
-  math::Quaternion rotation_diff_quat = this->model_target_rotation_ * model_world_pose.rot.GetInverse();
+  ignition::math::Vector3d model_angular_velocity = ignition::math::Vector3d::Zero;
+  ignition::math::Quaterniond rotation_diff_quat = this->model_target_rotation_ * model_world_pose.Rot().Inverse();
 
-  math::Vector3 rotation_diff_axis;
+  ignition::math::Vector3d rotation_diff_axis;
   double rotation_diff_angle;
-  rotation_diff_quat.GetAsAxis(rotation_diff_axis, rotation_diff_angle);
+  rotation_diff_quat.ToAxis(rotation_diff_axis, rotation_diff_angle);
   if (rotation_diff_angle > 0.1f)
   {
     model_angular_velocity = this->rotation_velocity_speed_factor_ * rotation_diff_axis * rotation_diff_angle;
@@ -119,7 +119,7 @@ void AvatarControlPlugin::OnUpdate(const common::UpdateInfo & /*_info*/)
   this->model_->SetAngularVel(model_angular_velocity);
 
   // update via link pose targets
-  for (std::map<physics::LinkPtr, gazebo::math::Pose>::iterator it = link_pose_targets_.begin(); it != link_pose_targets_.end(); ++it) {
+  for (std::map<physics::LinkPtr, ignition::math::Pose3d>::iterator it = link_pose_targets_.begin(); it != link_pose_targets_.end(); ++it) {
     this->UpdateLinkVelocitiesFromPoseTargets(it->first);
   }
 
@@ -327,18 +327,18 @@ void AvatarControlPlugin::LinkPoseCB(const geometry_msgs::Pose::ConstPtr &msg, c
   auto target = link_pose_targets_.find(link);
   if (target == link_pose_targets_.end())
   {
-    link_pose_targets_.insert(std::make_pair(link, gazebo::math::Pose()));
+    link_pose_targets_.insert(std::make_pair(link, ignition::math::Pose3d()));
   }
 
-  link_pose_targets_[link].pos.Set(msg->position.x, msg->position.y, msg->position.z);
-  link_pose_targets_[link].rot.Set(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+  link_pose_targets_[link].Pos().Set(msg->position.x, msg->position.y, msg->position.z);
+  link_pose_targets_[link].Rot().Set(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
 }
 
 void AvatarControlPlugin::LinkLinearVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link)
 {
   ROS_DEBUG("LinkLinearVelocityCB called! link name = %s, link vel = %.2f %.2f %.2f ",
             link->GetName().c_str(), msg->x, msg->y, msg->z);
-  gazebo::math::Vector3 velocity(msg->x, msg->y, msg->z);
+  ignition::math::Vector3d velocity(msg->x, msg->y, msg->z);
   link->SetLinearVel(velocity);
 }
 
@@ -352,10 +352,10 @@ void AvatarControlPlugin::UpdateLinkVelocitiesFromPoseTargets(const physics::Lin
 
 void AvatarControlPlugin::UpdateLinkLinearVelocityFromPositionTarget(const physics::LinkPtr &link)
 {
-  math::Vector3 linear_velocity = math::Vector3::Zero;
-  math::Vector3 position_diff = this->link_pose_targets_.at(link).pos - link->GetWorldPose().pos;
+  ignition::math::Vector3d linear_velocity = ignition::math::Vector3d::Zero;
+  ignition::math::Vector3d position_diff = this->link_pose_targets_.at(link).Pos() - link->WorldPose().Pos();
 
-  if (position_diff.GetLength() > this->link_pos_target_diff_threshold_)
+  if (position_diff.Length() > this->link_pos_target_diff_threshold_)
   {
     linear_velocity = this->link_linear_velocity_speed_factor_ * position_diff;
   }
@@ -364,12 +364,12 @@ void AvatarControlPlugin::UpdateLinkLinearVelocityFromPositionTarget(const physi
 
 void AvatarControlPlugin::UpdateLinkAngularVelocityFromRotationTarget(const physics::LinkPtr &link)
 {
-  math::Vector3 angular_velocity = math::Vector3::Zero;
-  math::Quaternion rotation_diff_quat = this->link_pose_targets_.at(link).rot * link->GetWorldPose().rot.GetInverse();
+  ignition::math::Vector3d angular_velocity = ignition::math::Vector3d::Zero;
+  ignition::math::Quaterniond rotation_diff_quat = this->link_pose_targets_.at(link).Rot() * link->WorldPose().Rot().Inverse();
 
-  math::Vector3 rotation_diff_axis;
+  ignition::math::Vector3d rotation_diff_axis;
   double rotation_diff_angle;
-  rotation_diff_quat.GetAsAxis(rotation_diff_axis, rotation_diff_angle);
+  rotation_diff_quat.ToAxis(rotation_diff_axis, rotation_diff_angle);
   if (rotation_diff_angle > this->link_rot_target_diff_threshold_)
   {
     angular_velocity = this->link_angular_velocity_speed_factor_ * rotation_diff_axis * rotation_diff_angle;

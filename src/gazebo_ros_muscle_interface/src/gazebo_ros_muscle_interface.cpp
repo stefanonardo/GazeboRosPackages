@@ -103,7 +103,7 @@ void MuscleInterfacePlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   {
     physics::WorldPtr world = m_model->GetWorld();
     if (world)
-      m_engine = boost::dynamic_pointer_cast<physics::OpensimPhysics>(world->GetPhysicsEngine());
+      m_engine = boost::dynamic_pointer_cast<physics::OpensimPhysics>(world->Physics());
   }
   if (m_model == nullptr || m_engine == nullptr)
     gzwarn << "Muscle control plugin loaded without OpenSim physics plugin." << std::endl;
@@ -131,11 +131,11 @@ void MuscleInterfacePlugin::FillStateMessage()
 
   MuscleStates &msg = m_muscle_states_msg;
 
-  gazebo::common::Time curTime = this->m_model->GetWorld()->GetSimTime();
+  gazebo::common::Time curTime = this->m_model->GetWorld()->SimTime();
   msg.header.stamp.sec = curTime.sec;
   msg.header.stamp.nsec = curTime.nsec;
 
-  std::vector<gazebo::math::Vector3> muscle_path;
+  std::vector<ignition::math::Vector3d> muscle_path;
 
   const physics::Muscle_V muscles = m_model->GetMuscles();
   msg.muscles.resize(muscles.size());
@@ -157,10 +157,10 @@ void MuscleInterfacePlugin::FillStateMessage()
     state_msg.path_points.resize(muscle_path.size());
     for (std::size_t i=0; i<muscle_path.size(); ++i)
     {
-      gazebo::math::Vector3 p = muscle_path[i];
-      state_msg.path_points[i].x = p.x;
-      state_msg.path_points[i].y = p.y;
-      state_msg.path_points[i].z = p.z;
+      ignition::math::Vector3d p = muscle_path[i];
+      state_msg.path_points[i].x = p.X();
+      state_msg.path_points[i].y = p.Y();
+      state_msg.path_points[i].z = p.Z();
     }
   }
 }

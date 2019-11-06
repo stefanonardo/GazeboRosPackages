@@ -322,7 +322,7 @@ void GazeboRosCameraUtils::LoadThread()
   rostopic += "/";
   rostopic += this->image_topic_name_.c_str();
 
-  physics::ModelPtr parent_model = this->world_->GetModel(GetModelName(this->parentSensor_));
+  physics::ModelPtr parent_model = this->world_->ModelByName(GetModelName(this->parentSensor_));
 
   // Call RosTopicNames
   parent_model->SaveSensorRosTopicNames(this->camera_name_.c_str(), rostopic, "sensor_msgs/Image");
@@ -495,7 +495,7 @@ void GazeboRosCameraUtils::Init()
   else
   {
     // check against float precision
-    if (!gazebo::math::equal(this->focal_length_, computed_focal_length))
+    if (!ignition::math::equal(this->focal_length_, computed_focal_length))
     {
       ROS_WARN("The <focal_length>[%f] you have provided for camera_ [%s]"
                " is inconsistent with specified image_width [%d] and"
@@ -623,7 +623,7 @@ void GazeboRosCameraUtils::PublishCameraInfo()
   if (this->camera_info_pub_.getNumSubscribers() > 0)
   {
     this->sensor_update_time_ = this->parentSensor_->LastUpdateTime();
-    common::Time cur_time = this->world_->GetSimTime();
+    common::Time cur_time = this->world_->SimTime();
     if (cur_time - this->last_info_update_time_ >= this->update_period_)
     {
       this->PublishCameraInfo(this->camera_info_pub_);

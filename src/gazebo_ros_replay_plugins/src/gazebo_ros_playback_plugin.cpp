@@ -217,7 +217,7 @@ void GazeboRosPlaybackPlugin::playback()
     while(this->_isPlaying)
     {
       // next target time is the current sim time plus the recording rate increment
-      gazebo::common::Time target = this->_world->GetSimTime() + dt;
+      gazebo::common::Time target = this->_world->SimTime() + dt;
 
       // run the ros and gzserver updates in parallel
       auto rosbag_run = boost::bind(&rosbag::Player::runFor, this->_rosbagPtr, target.sec, target.nsec);
@@ -233,7 +233,7 @@ void GazeboRosPlaybackPlugin::playback()
       gz_thread.join();
 
       // we've reached the end of the current playback files
-      if(this->_isPlaying && this->_world->GetSimTime() >= gazebo::util::LogPlay::Instance()->LogEndTime())
+      if(this->_isPlaying && this->_world->SimTime() >= gazebo::util::LogPlay::Instance()->LogEndTime())
       {
         // load the next files or rollover back to the start
         int next = this->_logIndex + 1;
@@ -321,7 +321,7 @@ bool GazeboRosPlaybackPlugin::setPlaybackIndex(int index)
   }
 
   // mark models for deletion / update them between scene changes
-  for(auto model : this->_world->GetModels())
+  for(auto model : this->_world->Models())
   {
     // the model is no longer in the scene, mark for deletion
     if(objects.find(model->GetName()) == objects.end())

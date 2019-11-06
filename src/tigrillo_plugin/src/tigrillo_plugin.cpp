@@ -1,8 +1,14 @@
 
 #include "tigrillo_plugin.h"
+#include <math.h>
 
 namespace gazebo
 {
+
+	inline double radiansToDegrees(double radians) {
+		return radians * (180.0 / M_PI);
+	}
+
 	TigrilloPlugin::TigrilloPlugin()
 	{
 		kill_sim_ = false;
@@ -11,7 +17,7 @@ namespace gazebo
 
 	TigrilloPlugin::~TigrilloPlugin()
 	{
-		event::Events::DisconnectWorldUpdateBegin(this->UpdateConnection);
+		this->UpdateConnection.reset();
 		
 		this->ros_node->shutdown();
 		kill_sim_ = true;
@@ -23,7 +29,7 @@ namespace gazebo
 	{
 		ROS_INFO("Loading Tigrillo Plugin");
 		ROS_INFO_STREAM("Gazebo is using the physics engine: " <<
-		_model->GetWorld()->GetPhysicsEngine()->GetType());
+		_model->GetWorld()->Physics()->GetType());
 
 		// Set Timer parameters
 		delay_s_ = 1.0 / 10.0;
@@ -31,6 +37,11 @@ namespace gazebo
 			delay_s_ = 1.0 / _sdf->Get<double>("freq");
 		}
 
+		delay_s_ = 1.0 / 10.0;
+		if (_sdf->HasElement("freq") && _sdf->Get<double>("freq") > 0) {
+			delay_s_ = 1.0 / _sdf->Get<double>("freq");
+ 		}
+		
 		// Set PID parameters
 		double p = 5;
 		double i = 0;
@@ -120,10 +131,10 @@ namespace gazebo
 	void TigrilloPlugin::SetPositionTarget(float _pos[])
 	{
 		// Set the joint's target position.
-		float p_pos_0 = this->joint_shoulder_L->GetAngle(0).Degree();
-		float p_pos_1 = this->joint_shoulder_R->GetAngle(0).Degree();
-		float p_pos_2 = this->joint_hip_L->GetAngle(0).Degree();
-		float p_pos_3 = this->joint_hip_R->GetAngle(0).Degree();
+		float p_pos_0 = radiansToDegrees(this->joint_shoulder_L->Position(0));
+		float p_pos_1 = radiansToDegrees(this->joint_shoulder_R->Position(0));
+		float p_pos_2 = radiansToDegrees(this->joint_hip_L->Position(0));
+		float p_pos_3 = radiansToDegrees(this->joint_hip_R->Position(0));
 		// ROS_INFO_STREAM("Updating position. Previous " << p_pos_0 << " "
 		// 	<< p_pos_1 << " " << p_pos_2 << " " << p_pos_3 << " and new: "
 		// 	<< _pos[0] << " " <<_pos[1] << " " << _pos[2] << " " << _pos[3]);
@@ -153,10 +164,10 @@ namespace gazebo
 	void TigrilloPlugin::GetSensors(float _sens[])
 	{
 		// Get joint position
-		_sens[0] = this->joint_elbow_L->GetAngle(0).Degree() + this->knee_angle;
-		_sens[1] = this->joint_elbow_R->GetAngle(0).Degree() + this->knee_angle;
-		_sens[2] = this->joint_knee_L->GetAngle(0).Degree() + this->knee_angle;
-		_sens[3] = this->joint_knee_R->GetAngle(0).Degree() + this->knee_angle;
+		_sens[0] = radiansToDegrees(this->joint_elbow_L->Position(0) + this->knee_angle);
+		_sens[1] = radiansToDegrees(this->joint_elbow_R->Position(0) + this->knee_angle);
+		_sens[2] = radiansToDegrees(this->joint_knee_L->Position(0) + this->knee_angle);
+		_sens[3] = radiansToDegrees(this->joint_knee_R->Position(0) + this->knee_angle);
 
 		// Add noise?
 	}
@@ -165,10 +176,10 @@ namespace gazebo
 	void TigrilloPlugin::GetMotors(float _mot[])
 	{
 		// Get joint position
-		_mot[0] = this->joint_shoulder_L->GetAngle(0).Degree();
-		_mot[1] = this->joint_shoulder_R->GetAngle(0).Degree();
-		_mot[2] = this->joint_hip_L->GetAngle(0).Degree();
-		_mot[3] = this->joint_hip_R->GetAngle(0).Degree();
+		_mot[0] = radiansToDegrees(this->joint_shoulder_L->Position(0));
+		_mot[1] = radiansToDegrees(this->joint_shoulder_R->Position(0));
+		_mot[2] = radiansToDegrees(this->joint_hip_L->Position(0));
+		_mot[3] = radiansToDegrees(this->joint_hip_R->Position(0));
 	}
 
 
@@ -224,7 +235,7 @@ namespace gazebo
 	
 	void TigrilloPlugin::OnUpdate()
 	{
-		double current_time = this->model->GetWorld()->GetSimTime().Double();
+		double current_time = this->model->GetWorld()->SimTime().Double();
 		
 		if (current_time - last_on_update_time_ < delay_s_)
 		{
@@ -242,7 +253,7 @@ namespace gazebo
 		sensorsMsg.FR = sensors[1];
 		sensorsMsg.BL = sensors[2];
 		sensorsMsg.BR = sensors[3];
-		sensorsMsg.run_time = this->model->GetWorld()->GetSimTime().Double();
+		sensorsMsg.run_time = this->model->GetWorld()->SimTime().Double();
 		// ROS_DEBUG_STREAM("Publishing sensors: FL: " << sensorsMsg.FL << " FR: " << 
 		// 	sensorsMsg.FR << " BL: " << sensorsMsg.BL << " BR: " << sensorsMsg.BR );
 		this->ros_pub_s.publish(sensorsMsg);
@@ -257,7 +268,7 @@ namespace gazebo
 		motorsMsg.FR = motors[1];
 		motorsMsg.BL = motors[2];
 		motorsMsg.BR = motors[3];
-		motorsMsg.run_time = this->model->GetWorld()->GetSimTime().Double();
+		motorsMsg.run_time = this->model->GetWorld()->SimTime().Double();
 		// ROS_DEBUG_STREAM("Publishing motors: FL: " << msg.FL << " FR: " << 
 		// 	msg.FR << " BL: " << msg.BL << " BR: " << msg.BR );
 		this->ros_pub_m.publish(motorsMsg);

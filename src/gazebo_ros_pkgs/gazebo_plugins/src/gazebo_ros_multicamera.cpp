@@ -104,7 +104,7 @@ void GazeboRosMultiCamera::OnNewFrameLeft(const unsigned char *_image,
 
   if (util->parentSensor_->IsActive())
   {
-    common::Time cur_time = util->world_->GetSimTime();
+    common::Time cur_time = util->world_->SimTime();
     if (cur_time - util->last_update_time_ >= util->update_period_)
     {
       util->PutCameraData(_image);
@@ -125,7 +125,7 @@ void GazeboRosMultiCamera::OnNewFrameRight(const unsigned char *_image,
 
   if (util->parentSensor_->IsActive())
   {
-    common::Time cur_time = util->world_->GetSimTime();
+    common::Time cur_time = util->world_->SimTime();
     if (cur_time - util->last_update_time_ >= util->update_period_)
     {
       util->PutCameraData(_image);

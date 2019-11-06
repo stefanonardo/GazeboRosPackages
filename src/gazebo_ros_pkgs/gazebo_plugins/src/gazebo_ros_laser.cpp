@@ -154,7 +154,7 @@ void GazeboRosLaser::LoadThread()
   this->parent_ray_sensor_->SetActive(false);
 
   // Save Rostopic Information
-  physics::ModelPtr parent_model = world_->GetModel(GetModelName(parent_ray_sensor_));
+  physics::ModelPtr parent_model = world_->ModelByName(GetModelName(parent_ray_sensor_));
 
   parent_model->SaveSensorRosTopicNames(parent_ray_sensor_->ScopedName(), topic_name_, "sensor_msgs/LaserScan");
 

@@ -65,7 +65,7 @@ namespace gazebo
           gazebo::physics::JointPtr left_eye, right_eye;
           left_eye = this->joints.at(this->model->GetName() + "::left_eye_pan");
           right_eye = this->joints.at(this->model->GetName() + "::right_eye_pan");
-          double vg = left_eye->GetAngle(0).Radian() - right_eye->GetAngle(0).Radian();
+          double vg = left_eye->Position(0) - right_eye->Position(0);
           double left_pan_pos = command + (vg / 2.0);
           double right_pan_pos = command - (vg / 2.0);
           this->jointControl->SetPositionTarget(this->model->GetName() + "::left_eye_pan", left_pan_pos);
@@ -76,7 +76,7 @@ namespace gazebo
           gazebo::physics::JointPtr left_eye, right_eye;
           left_eye = this->joints.at(this->model->GetName() + "::left_eye_pan");
           right_eye = this->joints.at(this->model->GetName() + "::right_eye_pan");
-          double vs = (left_eye->GetAngle(0).Radian() + right_eye->GetAngle(0).Radian()) / 2.0;
+          double vs = (left_eye->Position(0) + right_eye->Position(0)) / 2.0;
           double left_pan_pos = vs + (command / 2.0);
           double right_pan_pos = vs - (command / 2.0);
           this->jointControl->SetPositionTarget(this->model->GetName() + "::left_eye_pan", left_pan_pos);
@@ -250,17 +250,17 @@ namespace gazebo
       this->jointControl->Update();
       vector<string> joints_name;
 
-      gazebo::common::Time gazeboSimTime = this->model->GetWorld()->GetSimTime();
+      gazebo::common::Time gazeboSimTime = this->model->GetWorld()->SimTime();
       sensor_msgs::JointState msg;
       /* TODO: msg.header.seq should be populated too, ros::Time::now() automatically creates also a sequence number for the message
-         whereas this->model->GetWorld()->GetSimTime() does not. This is not a problem currently as we are never using that value, but
+         whereas this->model->GetWorld()->SimTime() does not. This is not a problem currently as we are never using that value, but
          for the sake of completeness a way to add this value properly should be found. */
       msg.header.stamp.sec = gazeboSimTime.sec;
       msg.header.stamp.nsec = gazeboSimTime.nsec;
       for (std::map<std::string, gazebo::physics::JointPtr>::iterator it = this->joints.begin(); it != this->joints.end(); ++it)
       {
         msg.name.push_back(it->second->GetName());
-        msg.position.push_back(it->second->GetAngle(0).Radian() * this->DegOrRad);
+        msg.position.push_back(it->second->Position(0) * this->DegOrRad);
         msg.velocity.push_back(it->second->GetVelocity(0) * this->DegOrRad);
         msg.effort.push_back(it->second->GetForce(0));
       }
@@ -269,14 +269,14 @@ namespace gazebo
       right_eye = this->joints.at(this->model->GetName() + "::right_eye_pan");
       //eye version
       msg.name.push_back("eye_version");
-      double vs_pos = (left_eye->GetAngle(0).Radian() + right_eye->GetAngle(0).Radian()) / 2.0;
+      double vs_pos = (left_eye->Position() + right_eye->Position(0)) / 2.0;
       msg.position.push_back(vs_pos * this->DegOrRad);
       double vs_vel = (left_eye->GetVelocity(0) + right_eye->GetVelocity(0)) / 2.0;
       msg.velocity.push_back(vs_vel * this->DegOrRad);
       msg.effort.push_back(0.0);
       //eye vergence
       msg.name.push_back("eye_vergence");
-      double vg_pos = left_eye->GetAngle(0).Radian() - right_eye->GetAngle(0).Radian();
+      double vg_pos = left_eye->Position() - right_eye->Position(0);
       msg.position.push_back(vg_pos * this->DegOrRad);
       double vg_vel = left_eye->GetVelocity(0) - right_eye->GetVelocity(0);
       msg.velocity.push_back(vg_vel * this->DegOrRad);

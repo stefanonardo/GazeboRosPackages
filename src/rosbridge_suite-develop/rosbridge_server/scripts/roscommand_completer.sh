@@ -5,15 +5,15 @@ export COMP_CWORD=${2}
 export COMP_WORDS=(${1})
 
 # load ros completion functions
-if [ -e "/opt/ros/kinetic/share/rosbash/rosbash" ]
+if [ -e "/opt/ros/melodic/share/rosbash/rosbash" ]
 then
     . /opt/ros/kinetic/share/rosbash/rosbash
 else
-    if [ -e "/opt/ros/indigo/share/rosbash/rosbash" ]
+    if [ -e "/opt/ros/kinetic/share/rosbash/rosbash" ]
     then
-        . /opt/ros/indigo/share/rosbash/rosbash
+        . /opt/ros/kinetic/share/rosbash/rosbash
     else
-        (>&2 echo "ROS indigo|kinetic not found!")
+        (>&2 echo "ROS kinetic|melodic not found!")
         exit 1
     fi
 fi

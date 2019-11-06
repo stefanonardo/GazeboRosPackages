@@ -27,7 +27,6 @@ public:
     // disconnect time reset listener events
     if (this->_timeResetConnection)
     {
-      event::Events::DisconnectTimeReset(this->_timeResetConnection);
       this->_timeResetConnection.reset();
     }
   }
