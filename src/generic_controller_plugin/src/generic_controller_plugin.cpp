@@ -136,7 +136,7 @@ void GenericControlPlugin::Load(physics::ModelPtr parent, sdf::ElementPtr sdf)
   m_js.effort.resize ( numJoints );
 
   // Listen to the update event. This event is broadcast every simulation iteration.
-  m_updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
+  m_updateConnection = event::Events::ConnectBeforePhysicsUpdate(boost::bind(&GenericControlPlugin::OnUpdate, this, _1));
 
   const std::string joint_states_topic_name = m_model->GetName() + "/" + "joint_states";
 
