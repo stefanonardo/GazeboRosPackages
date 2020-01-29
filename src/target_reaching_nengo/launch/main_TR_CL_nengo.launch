@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="arm_1_joint_cmd_pos_name" default="/hbp/arm_1_joint/cmd_pos" />
+  <arg name="arm_2_joint_cmd_pos_name" default="/hbp/arm_2_joint/cmd_pos" />
+  <arg name="arm_3_joint_cmd_pos_name" default="/hbp/arm_3_joint/cmd_pos" />
+  <arg name="up_down_lower_limit" default="[-2.8]" />
+  <arg name="up_down_upper_limit" default="[2.8]" />
+  <arg name="left_right_lower_limit" default="[-2.8]" />
+  <arg name="left_right_upper_limit" default="[2.8]" />
+  <arg name="near_far_lower_limit" default="[-2.8, -2.8]" />
+  <arg name="near_far_upper_limit" default="[2.8, 2.8]" />
+  <arg name="joint_states_topic" default="/joint_states" />
+  <arg name="shoulder_frame" default="arm_base_link" />
+  <arg name="tcp_frame" default="arm_tcp_link" />
+  <arg name="joint_names" default="['arm_1_joint', 'arm_2_joint', 'arm_3_joint', 'arm_4_joint', 'arm_5_joint', 'arm_6_joint']" />
+  <node name="Main_TR_CL_nengo_node" pkg="target_reaching_nengo" type="main_TR_CL_node.py" output="screen">
+    <param name="arm_1_joint_cmd_pos_name" value="$(arg arm_1_joint_cmd_pos_name)" />
+    <param name="arm_2_joint_cmd_pos_name" value="$(arg arm_2_joint_cmd_pos_name)" />
+    <param name="arm_3_joint_cmd_pos_name" value="$(arg arm_3_joint_cmd_pos_name)" />
+    <rosparam param="up_down_lower_limit" subst_value="True">$(arg up_down_lower_limit)</rosparam>
+    <rosparam param="up_down_upper_limit" subst_value="True">$(arg up_down_upper_limit)</rosparam>
+    <rosparam param="left_right_lower_limit" subst_value="True">$(arg left_right_lower_limit)</rosparam>
+    <rosparam param="left_right_upper_limit" subst_value="True">$(arg left_right_upper_limit)</rosparam>
+    <rosparam param="near_far_lower_limit" subst_value="True">$(arg near_far_lower_limit)</rosparam>
+    <rosparam param="near_far_upper_limit" subst_value="True">$(arg near_far_upper_limit)</rosparam>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)" />
+    <param name="shoulder_frame" value="$(arg shoulder_frame)" />
+    <param name="tcp_frame" value="$(arg tcp_frame)" />
+    <rosparam param="joint_names" subst_value="True">$(arg joint_names)</rosparam>
+  </node>
+</launch>

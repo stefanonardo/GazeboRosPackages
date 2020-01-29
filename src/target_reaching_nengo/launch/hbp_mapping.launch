@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="arm_trajectory_controller_name" default="arm_pos_traj_controller" />
+  <node name="hbp_mapping" pkg="target_reaching_nengo" type="target_reaching_to_hbp_mapping.py" output="screen">
+    <param name="arm_trajectory_controller_name" value="$(arg arm_trajectory_controller_name)" />
+  </node>
+</launch>
