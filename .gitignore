@@ -1,4 +1,5 @@
 src/CMakeLists.txt*
+*.orig
 
 # Generated directories
 
