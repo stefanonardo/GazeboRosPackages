@@ -15,7 +15,7 @@ from moveit_commander.conversions import pose_to_list
 from geometry_msgs.msg import Pose, Point, Quaternion
 import genpy
 from moveit_msgs.msg._RobotTrajectory import RobotTrajectory
-from multiprocessing import Lock
+from threading import Lock
 import std_msgs
 import std_srvs
 from cle_ros_msgs.srv import SetDuration, SetDurationRequest, SetDurationResponse
@@ -72,7 +72,7 @@ def callback(data):
     While executing a motion, ignore any additional triggers
     """
     if data.data != 0:
-        if moveLock.acquire(block=False):
+        if moveLock.acquire(False):
             global speed
             try:
                 execTrajectory(trajectoryIndex, speed)
@@ -151,8 +151,8 @@ if __name__ == '__main__':
     iiwa_group.execute(trajectory)
 
     # Create a subscriber that executes grasp motions
-    adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback)
-    reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback)
+    adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
+    reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
 
     time_pub = rospy.Publisher("traj_execution_time", std_msgs.msg.Duration, queue_size=10)
 
@@ -162,4 +162,16 @@ if __name__ == '__main__':
         # Time Pub
         duration = std_msgs.msg.Duration(execTime)
         time_pub.publish(duration)
-        sleep(0.1)
+
+        # Make sure arm isn't stuck
+        if moveLock.acquire(False):
+            try:
+                iiwa_group.go(upJointState)
+                grasp_group.go(open_gripper_target)
+            except:
+                moveLock.release()
+                raise
+
+            moveLock.release()
+
+        sleep(1)
