@@ -23,10 +23,12 @@ from time import sleep
 
 
 moveLock = Lock()
+
+return_speed = 1.0
+
 speed = 6.5
 trajectoryIndex = 8
 execTime = genpy.Duration()
-
 
 
 def createPoseFromJSONObj(posejsonobj):
@@ -44,7 +46,8 @@ def execTrajectory(trajIndex, speed=1.0):
     exec_traj = adjustSpeed(downTrajectories[trajIndex], speed)
     iiwa_group.execute(exec_traj)
     grasp_group.go(close_gripper_target)
-    iiwa_group.go(upJointState)
+    return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
+    grasp_group.execute(return_traj)
     grasp_group.go(open_gripper_target)
 
     return exec_traj
@@ -58,10 +61,9 @@ def adjustSpeed(old_traj, speed):
 
     for i in range(n_points):
         new_traj.joint_trajectory.points[i].time_from_start = old_traj.joint_trajectory.points[i].time_from_start / speed
-        for j in range(n_joints):
-            new_traj.joint_trajectory.points[i].velocities[j] = old_traj.joint_trajectory.points[i].velocities[j] * speed
-            new_traj.joint_trajectory.points[i].accelerations[j] = old_traj.joint_trajectory.points[i].accelerations[j] * speed
-            new_traj.joint_trajectory.points[i].positions[j] = old_traj.joint_trajectory.points[i].positions[j]
+        new_traj.joint_trajectory.points[i].velocities = [old_traj.joint_trajectory.points[i].velocities[j] * speed for j in range(n_joints)]
+        new_traj.joint_trajectory.points[i].accelerations = [old_traj.joint_trajectory.points[i].accelerations[j] * speed for j in range(n_joints)]
+        new_traj.joint_trajectory.points[i].positions = [old_traj.joint_trajectory.points[i].positions[j] for j in range(n_joints)]
 
     return new_traj
 
