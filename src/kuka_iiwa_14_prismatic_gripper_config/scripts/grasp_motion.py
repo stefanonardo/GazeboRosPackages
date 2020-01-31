@@ -21,6 +21,8 @@ from time import sleep
 
 
 moveLock = Lock()
+speed = 6.5
+trajectoryIndex = 8
 
 
 
@@ -69,7 +71,7 @@ def callback(data):
     if data.data != 0:
         if moveLock.acquire(block=False):
             try:
-                execTrajectory(8, 6.5)
+                execTrajectory(trajectoryIndex, speed)
                 sleep(0.01)
             except:
                 moveLock.release()
@@ -136,4 +138,10 @@ if __name__ == '__main__':
     adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback)
     reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback)
 
-    rospy.spin()
+    time_pub = rospy.Publisher("traj_execution_time", std_msgs.msg.Duration, queue_size=10)
+
+    while not rospy.is_shutdown():
+        # Time Pub
+        duration = std_msgs.msg.Duration(adjustSpeed(downTrajectories[trajectoryIndex], speed).joint_trajectory.points[-1].time_from_start)
+        time_pub.publish(duration)
+        sleep(0.1)
