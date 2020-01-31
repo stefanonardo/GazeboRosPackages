@@ -1,0 +1,4 @@
+std_msgs/Duration duration
+---
+bool success
+string error_message            # Error message

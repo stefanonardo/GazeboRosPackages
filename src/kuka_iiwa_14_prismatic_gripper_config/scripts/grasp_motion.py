@@ -17,12 +17,15 @@ import genpy
 from moveit_msgs.msg._RobotTrajectory import RobotTrajectory
 from multiprocessing import Lock
 import std_msgs
+import std_srvs
+from cle_ros_msgs.srv import SetDuration, SetDurationRequest, SetDurationResponse
 from time import sleep
 
 
 moveLock = Lock()
 speed = 6.5
 trajectoryIndex = 8
+execTime = genpy.Duration()
 
 
 
@@ -70,6 +73,7 @@ def callback(data):
     """
     if data.data != 0:
         if moveLock.acquire(block=False):
+            global speed
             try:
                 execTrajectory(trajectoryIndex, speed)
                 sleep(0.01)
@@ -78,6 +82,14 @@ def callback(data):
                 raise
 
             moveLock.release()
+
+
+def service_callback(data):
+    global execTime, speed
+    execTime = copy.deepcopy(data.duration.data)
+    speed = downTrajectories[trajectoryIndex].joint_trajectory.points[-1].time_from_start / execTime
+
+    return SetDurationResponse(success=True)
 
 
 if __name__ == '__main__':
@@ -130,6 +142,10 @@ if __name__ == '__main__':
     close_gripper_target = grasp_group.get_named_target_values("gripper_closed")
     open_gripper_target = grasp_group.get_named_target_values("gripper_open")
 
+    # Setup speed and execution time
+    execTime = genpy.Duration(0.5)
+    speed = downTrajectories[trajectoryIndex].joint_trajectory.points[-1].time_from_start / execTime
+
     # Move iiwa arm to start pose before accepting calls
     trajectory = iiwa_group.plan(upJointState)
     iiwa_group.execute(trajectory)
@@ -140,8 +156,10 @@ if __name__ == '__main__':
 
     time_pub = rospy.Publisher("traj_execution_time", std_msgs.msg.Duration, queue_size=10)
 
+    time_service = rospy.Service("set_traj_execution_time", SetDuration, service_callback)
+
     while not rospy.is_shutdown():
         # Time Pub
-        duration = std_msgs.msg.Duration(adjustSpeed(downTrajectories[trajectoryIndex], speed).joint_trajectory.points[-1].time_from_start)
+        duration = std_msgs.msg.Duration(execTime)
         time_pub.publish(duration)
         sleep(0.1)
