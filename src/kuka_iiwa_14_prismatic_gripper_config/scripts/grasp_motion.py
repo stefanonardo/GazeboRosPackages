@@ -27,7 +27,7 @@ moveLock = Lock()
 return_speed = 1.0
 
 speed = 6.5
-trajectoryIndex = 8
+trajectoryIndex = 7
 execTime = genpy.Duration()
 
 
