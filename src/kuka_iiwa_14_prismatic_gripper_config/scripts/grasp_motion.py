@@ -12,7 +12,7 @@ import geometry_msgs.msg
 from math import pi
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
-from geometry_msgs.msg import Pose, Point, Quaternion
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 import genpy
 from moveit_msgs.msg._RobotTrajectory import RobotTrajectory
 from threading import Lock
@@ -21,8 +21,11 @@ import std_srvs
 from cle_ros_msgs.srv import SetDuration, SetDurationRequest, SetDurationResponse
 from time import sleep
 
-
+targetPoseLock = Lock()
 moveLock = Lock()
+
+targetPose = Pose()
+robotPose = Pose(position=Point(x=1.0, y=-0.75, z=0.8))
 
 return_speed = 1.0
 
@@ -43,7 +46,9 @@ def execTrajectory(trajIndex, speed=1.0):
     conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
     opened again, releasing any object
     """
-    exec_traj = adjustSpeed(downTrajectories[trajIndex], speed)
+    with targetPoseLock:
+        exec_traj = iiwa_group.plan(targetPose)
+    exec_traj = adjustSpeed(exec_traj, speed)
     iiwa_group.execute(exec_traj)
     grasp_group.go(close_gripper_target)
     return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
@@ -54,6 +59,7 @@ def execTrajectory(trajIndex, speed=1.0):
 
 
 def adjustSpeed(old_traj, speed):
+    """Recalculate a trajectory with new speed"""
     new_traj = RobotTrajectory()
     new_traj.joint_trajectory = copy.deepcopy(old_traj.joint_trajectory)
     n_joints = len(old_traj.joint_trajectory.joint_names)
@@ -86,12 +92,40 @@ def callback(data):
             moveLock.release()
 
 
+def setTargetPose(data):
+    """Set the target position. Keep orientation the same (gripper facing down toward conveyor)"""
+    global targetPose
+    with targetPoseLock:
+        # Extract last frame's position
+        targetPose.position.x = data.data[-3]
+        targetPose.position.y = data.data[-2]
+        # NOTE: Keep the end effector z position the same. Just above the conveyor belt
+        # targetPose.position.z = data.data[-1] + 0.1
+
+        # Get relative position to robot
+        targetPose.position = targetPose.position - robotPose.position
+
+
 def service_callback(data):
+    """Set trajectory execution time"""
     global execTime, speed
     execTime = copy.deepcopy(data.duration.data)
     speed = downTrajectories[trajectoryIndex].joint_trajectory.points[-1].time_from_start / execTime
 
     return SetDurationResponse(success=True)
+
+
+def add_conveyor_collision(scene, robot):
+    """Create and add a collision box to the planning scene that prevents collision with the conveyor belt"""
+    p = PoseStamped()
+    p.header.frame_id = robot.get_planning_frame()
+    p.pose.position.x = 0.0
+    p.pose.position.y = -0.55
+    p.pose.position.z = -0.19
+
+    scene.add_box("conveyor", p, (2.5, 0.8, 0.6))
+
+    sleep(2)
 
 
 if __name__ == '__main__':
@@ -105,7 +139,8 @@ if __name__ == '__main__':
     robot = moveit_commander.RobotCommander(ns="/iiwa", robot_description="/iiwa/robot_description")
 
     # Initiate planning scene
-    scene = moveit_commander.PlanningSceneInterface(ns="/iiwa")
+    scene = moveit_commander.PlanningSceneInterface(ns="/iiwa", synchronous=True)
+    add_conveyor_collision(scene, robot)
 
     # Get IIWA arm planning group
     iiwa_group_name = "iiwa_plan_group"
@@ -152,13 +187,18 @@ if __name__ == '__main__':
     trajectory = iiwa_group.plan(upJointState)
     iiwa_group.execute(trajectory)
 
+    # Set first target pose to default down position
+    targetPose = downPoses[trajectoryIndex]
+
     # Create a subscriber that executes grasp motions
     adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
     reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
 
-    time_pub = rospy.Publisher("traj_execution_time", std_msgs.msg.Duration, queue_size=10)
+    pose_sub = rospy.Subscriber("/pred_pos", std_msgs.msg.Float32MultiArray, setTargetPose, queue_size=10)
 
-    time_service = rospy.Service("set_traj_execution_time", SetDuration, service_callback)
+    time_pub = rospy.Publisher("/traj_execution_time", std_msgs.msg.Duration, queue_size=10)
+
+    time_service = rospy.Service("/set_traj_execution_time", SetDuration, service_callback)
 
     while not rospy.is_shutdown():
         # Time Pub
