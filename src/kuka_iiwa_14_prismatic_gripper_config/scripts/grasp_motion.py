@@ -9,10 +9,11 @@ import moveit_commander
 import math
 import moveit_msgs.msg
 import geometry_msgs.msg
+from sensor_msgs.msg import Image
 from math import pi
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
-from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped, PointStamped
 import genpy
 from moveit_msgs.msg._RobotTrajectory import RobotTrajectory
 from threading import Lock
@@ -20,18 +21,65 @@ import std_msgs
 import std_srvs
 from cle_ros_msgs.srv import SetDuration, SetDurationRequest, SetDurationResponse
 from time import sleep
+import numpy as np
+from specs import localize_target
+from cv_bridge import CvBridge
+import torch
 
+velLock = Lock()
 targetPoseLock = Lock()
 moveLock = Lock()
 
+targetPoint = PointStamped()
 targetPose = Pose()
+targetVel = Point()
 robotPose = Pose(position=Point(x=1.0, y=-0.75, z=0.8))
 
+grasp_speed = 10
 return_speed = 1.0
 
 speed = 6.5
 trajectoryIndex = 13
 execTime = genpy.Duration()
+
+
+def getObjectPointFromImage(camera):
+    """"""
+    max_pix_value = 1.0
+    normalizer = 255.0 / max_pix_value
+    cam_img = CvBridge().imgmsg_to_cv2(camera.value, 'rgb8') / normalizer
+    cam_img = torch.tensor(cam_img).permute(2, 1, 0)
+
+    targ = localize_target(cam_img)
+
+    point = PointStamped(header=camera.header, point=Point(x=(1.562 - targ[0]/156.274), y=(-0.14 - targ[1]/152.691), z=(0.964 + targ[0] - targ[0])))
+    return point
+
+
+def updateObjectVelAndPose(camera):
+    """Compute object velocity from two different objects"""
+    global targetPoint
+
+    newTargetPoint = getObjectPointFromImage(camera)
+    if not (math.isnan(newTargetPoint.point.x) or math.isnan(newTargetPoint.point.y) or math.isnan(newTargetPoint.point.z)):
+        with velLock:
+            diffTime = rospy.Time(secs=newTargetPoint.header.stamp.secs, nsecs=newTargetPoint.header.stamp.nsecs) - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
+            targetVel.x = (newTargetPoint.point.x - targetPoint.point.x)/(diffTime.to_sec())
+            targetVel.y = (newTargetPoint.point.y - targetPoint.point.y) / (diffTime.to_sec())
+            targetVel.y = (newTargetPoint.point.z - targetPoint.point.z) / (diffTime.to_sec())
+
+            targetPoint = copy.deepcopy(newTargetPoint)
+
+
+def computeTargetPose():
+    global targetPoint, targetVel, targetPose
+    futureTime = execTime + rospy.Time.now() - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
+    targetPose.position.x = targetPoint.point.x + targetVel.x*futureTime.to_sec()
+    targetPose.position.y = targetPoint.point.y + targetVel.y*futureTime.to_sec()
+    targetPose.position.z = downPoses[trajectoryIndex].position.z
+    targetPose.orientation = downPoses[trajectoryIndex].orientation
+
+    return targetPose
 
 
 def createPoseFromJSONObj(posejsonobj):
@@ -40,22 +88,28 @@ def createPoseFromJSONObj(posejsonobj):
                 orientation=Quaternion(x=posejsonobj["orientation"]["x"], y=posejsonobj["orientation"]["y"], z=posejsonobj["orientation"]["z"], w=posejsonobj["orientation"]["w"]))
 
 
-def execTrajectory(trajIndex, speed=1.0):
+def getDistSquared(pose1, pose2):
+    return (pose1.position.x-pose2.position.x)**2 + (pose1.position.y-pose2.position.y)**2
+
+
+def execTrajectory(speed=1.0):
     """
     Execute trajectory with the given index. Assumes the arm is at uppose, then moves it to a position above the
     conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
     opened again, releasing any object
     """
     with targetPoseLock:
-        exec_traj = iiwa_group.plan(targetPose)
+        curTargetPose = targetPose
+    exec_traj = iiwa_group.plan(curTargetPose)
     exec_traj = adjustSpeed(exec_traj, speed)
     iiwa_group.execute(exec_traj)
-    grasp_group.go(close_gripper_target)
-    return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
-    grasp_group.execute(return_traj)
-    grasp_group.go(open_gripper_target)
-
-    return exec_traj
+    if getDistSquared(iiwa_group.get_current_pose().pose, curTargetPose) < 0.5*0.5:
+        exec_traj = adjustSpeed(grasp_group.plan(close_gripper_target), grasp_speed)
+        grasp_group.execute(exec_traj)
+        return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
+        grasp_group.execute(return_traj)
+        exec_traj = adjustSpeed(grasp_group.plan(open_gripper_target), grasp_speed)
+        grasp_group.execute(exec_traj)
 
 
 def adjustSpeed(old_traj, speed):
@@ -83,7 +137,7 @@ def callback(data):
         if moveLock.acquire(False):
             global speed
             try:
-                execTrajectory(trajectoryIndex, speed)
+                execTrajectory(speed)
                 sleep(0.01)
             except:
                 moveLock.release()
@@ -96,14 +150,14 @@ def setTargetPose(data):
     """Set the target position. Keep orientation the same (gripper facing down toward conveyor)"""
     global targetPose
     with targetPoseLock:
-        # Extract last frame's position
-        targetPose.position.x = data.data[-3]
-        targetPose.position.y = data.data[-2]
-        # NOTE: Keep the end effector z position the same. Just above the conveyor belt
-        # targetPose.position.z = data.data[-1] + 0.1
-
-        # Get relative position to robot
-        targetPose.position = targetPose.position - robotPose.position
+        if not (math.isnan(data.data[-3]) or math.isnan(data.data[-2])):
+            # Extract last frame's position, relative to the robot
+            targetPose.position.x = data.data[-3] - robotPose.position.x
+            targetPose.position.y = data.data[-2] - robotPose.position.y
+            # NOTE: Keep the end effector z position the same. Just above the conveyor belt
+            # targetPose.position.z = data.data[-1] + 0.1
+        #else:
+        #    rospy.logwarn("Grasp motion planner received array with undefined target position values")
 
 
 def service_callback(data):
@@ -139,18 +193,41 @@ if __name__ == '__main__':
     robot = moveit_commander.RobotCommander(ns="/iiwa", robot_description="/iiwa/robot_description")
 
     # Initiate planning scene
-    scene = moveit_commander.PlanningSceneInterface(ns="/iiwa", synchronous=True)
+    scene = moveit_commander.PlanningSceneInterface(ns="/iiwa")
     add_conveyor_collision(scene, robot)
 
+    maxAttempst = 5
+
     # Get IIWA arm planning group
+    attempts = 0
     iiwa_group_name = "iiwa_plan_group"
-    iiwa_group = moveit_commander.MoveGroupCommander(iiwa_group_name, ns="/iiwa",
-                                                     robot_description="/iiwa/robot_description")
+    while True:
+        try:
+            iiwa_group = moveit_commander.MoveGroupCommander(iiwa_group_name, ns="/iiwa",
+                                                             robot_description="/iiwa/robot_description")
+            break
+        except:
+            if attempts < maxAttempst and not rospy.is_shutdown():
+                rospy.logwarn("Failed to load iiwa planner. Retrying...")
+                attempts += 1
+            else:
+                raise
+
 
     # Get Gripper planning group
+    attempts = 0
     grasp_group_name = "grasp_plan_group"
-    grasp_group = moveit_commander.MoveGroupCommander(grasp_group_name, ns="/iiwa",
-                                                      robot_description="/iiwa/robot_description")
+    while True:
+        try:
+            grasp_group = moveit_commander.MoveGroupCommander(grasp_group_name, ns="/iiwa",
+                                                              robot_description="/iiwa/robot_description")
+            break
+        except:
+            if attempts < maxAttempst and not rospy.is_shutdown():
+                rospy.logwarn("Failed to load grasp planner. Retrying...")
+                attempts += 1
+            else:
+                raise
 
     # Load saved trajectories
     with open(jsonFileName, "r") as jsonFile:
@@ -194,7 +271,7 @@ if __name__ == '__main__':
     adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
     reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
 
-    pose_sub = rospy.Subscriber("/pred_pos", std_msgs.msg.Float32MultiArray, setTargetPose, queue_size=10)
+    pose_sub = rospy.Subscriber("/pred_pos", std_msgs.msg.Float32MultiArray, setTargetPose, queue_size=1)
 
     time_pub = rospy.Publisher("/traj_execution_time", std_msgs.msg.Duration, queue_size=10)
 
