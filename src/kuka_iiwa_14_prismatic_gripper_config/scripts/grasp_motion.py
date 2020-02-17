@@ -55,7 +55,7 @@ def getObjectPointFromImage(camera):
 
     targ = localize_target(cam_img)
 
-    point = PointStamped(header=camera.header, point=Point(x=(1.562 - targ[0]/156.274), y=(-0.14 - targ[1]/152.691), z=(0.964 + targ[0] - targ[0])))
+    point = PointStamped(header=camera.header, point=Point(x=(1.581 - targ[0]/154.29), y=(-0.16 - targ[1]/154.29), z=0.964))
     return point
 
 
@@ -85,7 +85,6 @@ def computeTargetPose():
 
     return targetPose
 
-
 def updateTargetPose(camera):
     global camImageNum
     if camImageNum < 5:
@@ -105,19 +104,56 @@ def getDistSquared(pose1, pose2):
     return (pose1.position.x-pose2.position.x)**2 + (pose1.position.y-pose2.position.y)**2
 
 
-def execTrajectory(speed=1.0):
+def execTrajectoryPath():
     """
     Execute trajectory with the given index. Assumes the arm is at uppose, then moves it to a position above the
     conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
     opened again, releasing any object
     """
+    global execTime
     with targetPoseLock:
-        exec_traj = iiwa_group.plan(targetPose)
+        targetPose = computeTargetPose()
+        curTargetPose = copy.deepcopy(targetPose)
 
+    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.15 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.15:
+        curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+    preTargetPose = copy.deepcopy(curTargetPose)
+    preTargetPose.position.z += 0.3
+    exec_traj = iiwa_group.compute_cartesian_path([preTargetPose, targetPose], 5, 0)[0]
+
+    if len(exec_traj.joint_trajectory.points) == 0:
+        return
+
+    # Add time for gripper closing
+    speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-genpy.Duration(0.15))
+    exec_traj = adjustSpeed(exec_traj, speed)
+    iiwa_group.execute(exec_traj)
+
+    close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
+    grasp_group.execute(close_traj)
+    return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
+    grasp_group.execute(return_traj)
+    grasp_group.go(open_gripper_target)
+
+
+def execTrajectory():
+    """
+    Execute trajectory with the given index. Assumes the arm is at uppose, then moves it to a position above the
+    conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
+    opened again, releasing any object
+    """
+    global execTime
+    with targetPoseLock:
+        targetPose = computeTargetPose()
+
+    exec_traj = iiwa_group.plan(targetPose)
     if len(exec_traj.joint_trajectory.points) > 0:
-        exec_traj = adjustSpeed(exec_traj, exec_traj.joint_trajectory.points[-1].time_from_start / execTime)
+        # Add time for gripper closing
+        speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-rospy.Duration(0.1))
+        exec_traj = adjustSpeed(exec_traj, speed)
         iiwa_group.execute(exec_traj)
-        grasp_group.go(close_gripper_target)
+        close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
+        grasp_group.execute(close_traj)
         return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
         grasp_group.execute(return_traj)
         grasp_group.go(open_gripper_target)
@@ -148,7 +184,7 @@ def callback(data):
         if moveLock.acquire(False):
             global speed
             try:
-                execTrajectory(speed)
+                execTrajectoryPath()
                 sleep(0.01)
             except:
                 moveLock.release()
@@ -282,7 +318,7 @@ if __name__ == '__main__':
     adaptive_sub = rospy.Subscriber("/adaptive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
     reactive_sub = rospy.Subscriber("/reactive_trigger", std_msgs.msg.Bool, callback, queue_size=1)
 
-    pose_sub = rospy.Subscriber("/pred_pos", std_msgs.msg.Float32MultiArray, setTargetPose, queue_size=1)
+    camera_sub = rospy.Subscriber("/camera/image_raw", Image, updateTargetPose, queue_size=1)
 
     time_pub = rospy.Publisher("/traj_execution_time", std_msgs.msg.Duration, queue_size=10)
 
