@@ -115,11 +115,16 @@ def execTrajectoryPath():
         targetPose = computeTargetPose()
         curTargetPose = copy.deepcopy(targetPose)
 
-    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.15 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.15:
+    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
         curTargetPose.position.x = downPoses[trajectoryIndex].position.x
-    preTargetPose = copy.deepcopy(curTargetPose)
-    preTargetPose.position.z += 0.3
-    exec_traj = iiwa_group.compute_cartesian_path([preTargetPose, targetPose], 5, 0)[0]
+
+    targetPoses = []
+    for i in range(5,0,-1):
+        tPose = copy.deepcopy(curTargetPose)
+        tPose.position.z += i*(0.3/5)
+        targetPoses.append(tPose)
+
+    exec_traj = iiwa_group.compute_cartesian_path(targetPoses, 5, 0)[0]
 
     if len(exec_traj.joint_trajectory.points) == 0:
         return
