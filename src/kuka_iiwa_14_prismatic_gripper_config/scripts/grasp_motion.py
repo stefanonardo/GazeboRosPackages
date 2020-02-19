@@ -119,7 +119,7 @@ def execTrajectoryPath():
         curTargetPose.position.x = downPoses[trajectoryIndex].position.x
 
     targetPoses = []
-    for i in range(5,0,-1):
+    for i in range(5,-1,-1):
         tPose = copy.deepcopy(curTargetPose)
         tPose.position.z += i*(0.3/5)
         targetPoses.append(tPose)
@@ -130,7 +130,7 @@ def execTrajectoryPath():
         return
 
     # Add time for gripper closing
-    speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-genpy.Duration(0.15))
+    speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-genpy.Duration(0.1))
     exec_traj = adjustSpeed(exec_traj, speed)
     iiwa_group.execute(exec_traj)
 
