@@ -76,9 +76,9 @@ def updateObjectVelAndPose(camera):
         targetPoint = copy.deepcopy(newTargetPoint)
 
 
-def computeTargetPose():
+def computeTargetPose(graspTime):
     global targetPoint, targetVel, targetPose
-    futureTime = execTime + rospy.Time.now() - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
+    futureTime = graspTime + rospy.Time.now() - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
     with velLock:
         targetPose.position.x = targetPoint.point.x + targetVel.x*futureTime.to_sec() - robotPose.position.x
         targetPose.position.y = targetPoint.point.y + targetVel.y*futureTime.to_sec() - robotPose.position.y
@@ -114,11 +114,11 @@ def execTrajectoryPath():
     """
     global execTime
     with targetPoseLock:
-        targetPose = computeTargetPose()
+        targetPose = computeTargetPose(execTime)
         curTargetPose = copy.deepcopy(targetPose)
 
-    #if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
-    #    curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
+        curTargetPose.position.x = downPoses[trajectoryIndex].position.x
 
     prevTargetPose = copy.deepcopy(curTargetPose)
     prevTargetPose.position.z += 0.10
@@ -136,22 +136,31 @@ def execTrajectoryPath():
     iiwa_group.set_start_state(RobotState(joint_state=joint_state))
     exec_traj2 = iiwa_group.plan(curTargetPose)
 
-    trajExecTime1 = exec_traj1.joint_trajectory.points[-1].time_from_start
-    trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
-
-    totalTrajExecTime = trajExecTime1 + trajExecTime2
+    totalTrajExecTime = exec_traj1.joint_trajectory.points[-1].time_from_start + exec_traj2.joint_trajectory.points[-1].time_from_start
     
     # Add time for gripper closing
     speed = totalTrajExecTime/(execTime-genpy.Duration(0.25))
     exec_traj1 = adjustSpeed(exec_traj1, speed)
     repeat = 0
-    while iiwa_group.execute(exec_traj1) != True and repeat < 5:
+    while iiwa_group.execute(exec_traj1) is not True and repeat < 5:
         repeat += 1
         sleep(0.01)
+
     exec_traj2 = adjustSpeed(exec_traj2, speed)
-    while iiwa_group.execute(exec_traj2) != True and repeat < 5:
-        repeat += 1
-        sleep(0.01)
+
+    if True:
+        trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
+        iiwa_group.set_start_state_to_current_state()
+        repeat = 0
+        while repeat < 10:
+            rospy.logwarn("Executing fallback")
+            rospy.logwarn(trajExecTime2)
+            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.050)*(repeat+1)))
+            exec_traj2 = iiwa_group.plan(curTargetPose)
+            if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
+                break
+            sleep(0.05)
+            repeat += 1
 
     close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
     grasp_group.execute(close_traj)
@@ -169,7 +178,7 @@ def execTrajectory():
     """
     global execTime
     with targetPoseLock:
-        targetPose = computeTargetPose()
+        targetPose = computeTargetPose(execTime)
 
     exec_traj = iiwa_group.plan(targetPose)
     if len(exec_traj.joint_trajectory.points) > 0:
