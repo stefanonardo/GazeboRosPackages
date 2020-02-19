@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 
+import collections
+import numpy as np
+
 import rospy
+import rospkg
 from external_module_interface.external_module import ExternalModule
 
 from gazebo_msgs.msg import ModelStates
-from std_msgs.msg import Bool
+from geometry_msgs.msg import Point
+from std_msgs.msg import Float32MultiArray, Bool
 
+Trial = collections.namedtuple('Trial', ['start_time', 'had_US', 'had_CR', 'CR_latency', 'ISI', 'CR', 'US', 'CS', 'obj_pos_px', 'obj_pos_gt', 'CR_obj_pos'])
 
 class IBAStatsCollector(ExternalModule):
     def __init__(self, module_name=None, steps=1):
@@ -20,25 +26,39 @@ class IBAStatsCollector(ExternalModule):
         self.trial_start_time = rospy.Time().now()
         self.CR_trigger_time = None
         self.US_time = None
+        self.CR_vec = []
+        self.US_vec = []
+        self.CS_vec = []
+        self.obj_pos_px_vec = [] # pixel location
+        self.obj_pos_gt_vec = [] # ground truth
+        self.CR_obj_pos = None
 
-        self.had_US_vec = []
-        self.had_CR_vec = []
-        self.CR_latency_vec = [] # trial start to CR trigger
-        self.ISI_vec = []
+        self.trials = []
 
         rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_states_callback)
         rospy.Subscriber("/reactive_trigger", Bool, self.reactive_trigger_callback)
         rospy.Subscriber("/adaptive_trigger", Bool, self.adaptive_trigger_callback)
+        rospy.Subscriber("/latent", Float32MultiArray, self.latent_callback)
+        rospy.Subscriber("/obj_pos", Point, self.obj_pos_callback)
+
+    def run_step(self):
+        for m in [self.database_resp.m1, self.database_resp.m2, self.database_resp.m3]: 
+            if len(m) > 2 and m[1] == 0: # workaround to select the one with "ID 0". Firs element is ??, second is what I set in the other node.
+                self.CR_vec += m[2:]
 
     def model_states_callback(self, msg):
+        # Given a new box position
         try:
             obj_index = msg.name.index('ball')
             obj_pos = msg.pose[obj_index].position
 
+            self.obj_pos_gt_vec.append( ( (rospy.Time().now()-self.trial_start_time).to_sec(), [obj_pos.x, obj_pos.y, obj_pos.z] ) )
+
             if self.last_obj_x is not None:
-                if obj_pos.x - self.last_obj_x < -0.1:
+                if obj_pos.x - self.last_obj_x < -0.1: # detects new trial if x has moved too fast in negative direction
                     self.trial_num += 1
 
+                    # Calculate stats for previous trial
                     if self.CR_trigger_time is None:
                         CR_latency = None
                     else:
@@ -49,18 +69,26 @@ class IBAStatsCollector(ExternalModule):
                     else:
                         ISI = (self.US_time - self.trial_start_time).to_sec()
 
-                    print("End of trial. Had US: ", self.had_US, " had CR:", self.had_CR, 'latency: ', CR_latency, 'ISI: ', ISI)
-                    self.had_US_vec.append(self.had_US)
-                    self.had_CR_vec.append(self.had_CR)
-                    self.CR_latency_vec.append(CR_latency)
-                    self.ISI_vec.append(ISI)
+                    rospy.loginfo("[Stats collector] Detected end of trial. Had US: %s, had CR: %s, latency: %s, ISI: %s" % (self.had_US, self.had_CR, CR_latency, ISI) )
 
+                    # Save trial stats
+                    t = Trial(self.trial_start_time.to_sec(), self.had_US, self.had_CR, CR_latency, ISI, self.CR_vec[:], self.US_vec[:], self.CS_vec[:], self.obj_pos_px_vec[:], self.obj_pos_gt_vec[:], self.CR_obj_pos)
+                    self.trials.append(t)
+
+                    # Reset trial variables
                     self.had_US = False
                     self.had_CR = False
-                    print("Start of new trial, ", self.trial_num)
                     self.trial_start_time = rospy.Time().now()
                     self.CR_trigger_time = None
                     self.US_time = None
+                    self.CR_vec = []
+                    self.US_vec = []
+                    self.CS_vec = []
+                    self.obj_pos_px_vec = []
+                    self.obj_pos_gt_vec = []
+                    self.CR_obj_pos = None
+                    rospy.loginfo("[Stats collector] Start of new trial: %d" % self.trial_num)
+
 
             self.last_obj_x = obj_pos.x
 
@@ -72,19 +100,31 @@ class IBAStatsCollector(ExternalModule):
         if not self.had_CR and self.CR:
             self.had_CR = True
             self.CR_trigger_time = rospy.Time().now()
-        
+            self.CR_obj_pos = self.last_obj_x
         
     def reactive_trigger_callback(self, msg):
         self.US = msg.data
+        self.US_vec.append( ( (rospy.Time().now()-self.trial_start_time).to_sec(), int(self.US) ) )
         if not self.had_US and self.US:
             self.had_US = True
             self.US_time = rospy.Time().now()
 
+    def latent_callback(self, msg):
+        dims = tuple(msg.layout.dim[i].size for i in range(len(msg.layout.dim)))
+        a = np.reshape(msg.data, dims) # has the shape defined in the message
+        self.CS = a.flatten().tolist() # however, we just flatten it here
+        self.CS_vec.append( ( (rospy.Time().now()-self.trial_start_time).to_sec(), self.CS ) )
+
+    def obj_pos_callback(self, msg):
+        self.obj_pos_px = msg.x
+        self.obj_pos_px_vec.append( ( (rospy.Time().now()-self.trial_start_time).to_sec(), self.obj_pos_px ) )
+
     def shutdown(self):
         import pickle
-        import os
-        fname = os.getcwd() + '/resources/cerebellum_stats.p'
-        pickle.dump({'had_US': self.had_US_vec, 'had_CR': self.had_CR_vec}, open(fname, 'wb'))
+        import time
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        fname = rospkg.RosPack().get_path('demonstrator6') + '/scripts/resources/cerebellum_stats_' + timestr + '.p'
+        pickle.dump(self.trials, open(fname, 'wb'))
 
 if __name__ == "__main__":
 
