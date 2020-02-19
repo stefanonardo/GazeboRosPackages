@@ -18,12 +18,12 @@ class IBACerebellum(ExternalModule):
         self.steps = steps
 
     def initialize(self):
-        Ts = 1e-3
+        desired_Ts = 1e-3 # with rounding we might not get this exact Ts, since the IBA only divides the CLE time step by powers of 2
         n_inputs = 320
         n_bases = 25
         beta = 2e-4  
-        kc = 0.5
-        delta = 500 # units of Ts
+        kc = 0.05
+        delta = 650 # units of Ts - TODO: correct when real Ts is different? e.g. when real Ts will be 1.25 ms, we need to put 400 for 500 ms delay
 
         self.CS = None
         self.obj_pos = None
@@ -31,23 +31,28 @@ class IBACerebellum(ExternalModule):
 
         self.output = None
         self.CR = False
-        self.CR_threshold = 0.5
+        self.CR_threshold = 1.0 #0.5
 
         cle_Ts = 20e-3 # Has to match the CLE timestep set in "bibi_configuration.bibi"
-        self.n_steps_per_cle_step = int(cle_Ts/Ts/self.steps) # assuming self.steps contains the steps given at initialization
+        self.n_steps_per_cle_step = int(cle_Ts/desired_Ts/self.steps) # assuming self.steps contains the steps given at initialization
+        Ts = cle_Ts / self.n_steps_per_cle_step / self.steps # the resulting Ts
+        rospy.loginfo("[Cerebellum] Timestep set to " + str(Ts))
+        rospy.loginfo("[Cerebellum] Going to run " + str(self.n_steps_per_cle_step) + " steps per CLE step")
 
-        self.use_trained_model = True
+        self.use_trained_model = False
+        self.save_model = True
         self.debug_logging = False
         
         self.basepath = rospkg.RosPack().get_path('demonstrator6') + '/scripts'
 
         self.c = Cerebellum(Ts, n_inputs, n_bases, beta/n_inputs, kc, delta) 
+        self.c_out_share = [0]
 
         if self.use_trained_model:
             self.c.import_state( pickle.load( open( self.basepath + '/resources/cerebellum_state.p', "rb" ) ) )
-            rospy.loginfo("Cerebellum save loaded.")
+            rospy.loginfo("[Cerebellum] Weights loaded from save.")
         else:
-            rospy.loginfo("Initialized cerebellum with random weights.")
+            rospy.loginfo("[Cerebellum] Initialized with random weights.")
 
 
         rospy.Subscriber("/latent", Float32MultiArray, self.latent_callback) # MF - CS
@@ -63,12 +68,17 @@ class IBACerebellum(ExternalModule):
 
     def run_step(self):
         ## Main cerebellum code
-        if self.CS is not None:
+        if self.CS is not None: # wait for first input
+            self.c_out_share = [0]
+            
             crs = np.zeros(self.n_steps_per_cle_step, dtype=bool)
             for i in range(self.n_steps_per_cle_step):
                 self.c.step(self.CS, self.US)
                 self.output = self.c.output
                 crs[i] = self.output > self.CR_threshold
+
+                #print("C output: " + str(self.output) )
+                self.c_out_share.append(self.output)
                 
                 # LOG
                 if self.debug_logging:
@@ -82,6 +92,10 @@ class IBACerebellum(ExternalModule):
         trig_msg.data = self.CR
         self.trig_pub.publish(trig_msg)
 
+    def share_module_data(self):
+        if self.CS is not None: # wait for first input
+            self.module_data = self.c_out_share
+
     def shutdown(self):
         ## LOG time series data
         if self.debug_logging:
@@ -93,7 +107,7 @@ class IBACerebellum(ExternalModule):
                 open( fname, "wb" ) ) 
 
         # Save model parameters if it is a new one.
-        if not self.use_trained_model:
+        if self.save_model:
             fname = self.basepath + '/resources/cerebellum_state.p'
             pickle.dump( self.c.export_state(), open(fname, "wb" ) )
 
