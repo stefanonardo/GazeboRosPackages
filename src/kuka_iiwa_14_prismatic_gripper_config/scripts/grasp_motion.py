@@ -16,6 +16,8 @@ from moveit_commander.conversions import pose_to_list
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped, PointStamped
 import genpy
 from moveit_msgs.msg._RobotTrajectory import RobotTrajectory
+from moveit_msgs.msg import RobotState
+from sensor_msgs.msg import JointState
 from threading import Lock
 import std_msgs
 import std_srvs
@@ -115,27 +117,45 @@ def execTrajectoryPath():
         targetPose = computeTargetPose()
         curTargetPose = copy.deepcopy(targetPose)
 
-    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
-        curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+    #if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
+    #    curTargetPose.position.x = downPoses[trajectoryIndex].position.x
 
-    targetPoses = []
-    for i in range(5,-1,-1):
-        tPose = copy.deepcopy(curTargetPose)
-        tPose.position.z += i*(0.3/5)
-        targetPoses.append(tPose)
+    prevTargetPose = copy.deepcopy(curTargetPose)
+    prevTargetPose.position.z += 0.10
 
-    exec_traj = iiwa_group.compute_cartesian_path(targetPoses, 5, 0)[0]
-
-    if len(exec_traj.joint_trajectory.points) == 0:
+    iiwa_group.set_start_state_to_current_state()
+    exec_traj1 = iiwa_group.plan(prevTargetPose)
+    if len(exec_traj1.joint_trajectory.points) == 0:
         return
 
+    joint_state = JointState()
+    joint_state.header.stamp = rospy.Time.now()
+    joint_state.name = iiwa_group.get_active_joints()
+    joint_state.position = exec_traj1.joint_trajectory.points[-1].positions
+    joint_state.velocity = exec_traj1.joint_trajectory.points[-1].velocities
+    iiwa_group.set_start_state(RobotState(joint_state=joint_state))
+    exec_traj2 = iiwa_group.plan(curTargetPose)
+
+    trajExecTime1 = exec_traj1.joint_trajectory.points[-1].time_from_start
+    trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
+
+    totalTrajExecTime = trajExecTime1 + trajExecTime2
+    
     # Add time for gripper closing
-    speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-genpy.Duration(0.1))
-    exec_traj = adjustSpeed(exec_traj, speed)
-    iiwa_group.execute(exec_traj)
+    speed = totalTrajExecTime/(execTime-genpy.Duration(0.25))
+    exec_traj1 = adjustSpeed(exec_traj1, speed)
+    repeat = 0
+    while iiwa_group.execute(exec_traj1) != True and repeat < 5:
+        repeat += 1
+        sleep(0.01)
+    exec_traj2 = adjustSpeed(exec_traj2, speed)
+    while iiwa_group.execute(exec_traj2) != True and repeat < 5:
+        repeat += 1
+        sleep(0.01)
 
     close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
     grasp_group.execute(close_traj)
+    iiwa_group.set_start_state_to_current_state()
     return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
     grasp_group.execute(return_traj)
     grasp_group.go(open_gripper_target)
@@ -345,4 +365,4 @@ if __name__ == '__main__':
 
             moveLock.release()
 
-        sleep(1)
+        sleep(10)
