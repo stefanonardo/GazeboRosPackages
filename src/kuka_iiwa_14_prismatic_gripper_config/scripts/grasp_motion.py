@@ -139,10 +139,10 @@ def execTrajectoryPath():
     totalTrajExecTime = exec_traj1.joint_trajectory.points[-1].time_from_start + exec_traj2.joint_trajectory.points[-1].time_from_start
     
     # Add time for gripper closing
-    speed = totalTrajExecTime/(execTime-genpy.Duration(0.25))
+    speed = totalTrajExecTime/(execTime-genpy.Duration(0.0))
     exec_traj1 = adjustSpeed(exec_traj1, speed)
     repeat = 0
-    while iiwa_group.execute(exec_traj1) is not True and repeat < 5:
+    while iiwa_group.execute(exec_traj1) is not True and repeat < 0:
         repeat += 1
         sleep(0.01)
 
@@ -153,13 +153,13 @@ def execTrajectoryPath():
         iiwa_group.set_start_state_to_current_state()
         repeat = 0
         while repeat < 10:
-            rospy.logwarn("Executing fallback")
-            rospy.logwarn(trajExecTime2)
-            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.050)*(repeat+1)))
-            exec_traj2 = iiwa_group.plan(curTargetPose)
+            #rospy.logwarn("Executing fallback")
+            #rospy.logwarn(trajExecTime2)
+            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.125)+rospy.Duration(0.005)*repeat))
+            exec_traj2 = iiwa_group.compute_cartesian_path([curTargetPose], 0.01, 0)[0]
             if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
                 break
-            sleep(0.05)
+            sleep(0.005)
             repeat += 1
 
     close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
