@@ -27,7 +27,6 @@ import numpy as np
 from specs import localize_target
 from cv_bridge import CvBridge
 import torch
-import imutils
 
 velLock = Lock()
 targetPoseLock = Lock()
@@ -155,7 +154,7 @@ def execTrajectoryPath():
         while repeat < 10:
             #rospy.logwarn("Executing fallback")
             #rospy.logwarn(trajExecTime2)
-            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.125)+rospy.Duration(0.005)*repeat))
+            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.15)+rospy.Duration(0.005)*repeat))
             exec_traj2 = iiwa_group.compute_cartesian_path([curTargetPose], 0.01, 0)[0]
             if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
                 break
