@@ -67,12 +67,13 @@ def updateObjectVelAndPose(camera):
     newTargetPoint = getObjectPointFromImage(camera)
     if not (math.isnan(newTargetPoint.point.x) or math.isnan(newTargetPoint.point.y) or math.isnan(newTargetPoint.point.z)):
         diffTime = rospy.Time(secs=newTargetPoint.header.stamp.secs, nsecs=newTargetPoint.header.stamp.nsecs) - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
-        with velLock:
-            targetVel.x = (newTargetPoint.point.x - targetPoint.point.x)/(diffTime.to_sec())
-            targetVel.y = (newTargetPoint.point.y - targetPoint.point.y) / (diffTime.to_sec())
-            targetVel.y = (newTargetPoint.point.z - targetPoint.point.z) / (diffTime.to_sec())
+        if diffTime.to_sec() > 0.001:
+            with velLock:
+                targetVel.x = (newTargetPoint.point.x - targetPoint.point.x) / (diffTime.to_sec())
+                targetVel.y = (newTargetPoint.point.y - targetPoint.point.y) / (diffTime.to_sec())
+                targetVel.y = (newTargetPoint.point.z - targetPoint.point.z) / (diffTime.to_sec())
 
-        targetPoint = copy.deepcopy(newTargetPoint)
+            targetPoint = copy.deepcopy(newTargetPoint)
 
 
 def computeTargetPose(graspTime):
