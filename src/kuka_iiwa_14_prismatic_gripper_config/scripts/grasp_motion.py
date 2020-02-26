@@ -21,6 +21,7 @@ from sensor_msgs.msg import JointState
 from threading import Lock
 import std_msgs
 import std_srvs
+from gazebo_msgs.srv import GetModelState
 from cle_ros_msgs.srv import SetDuration, SetDurationRequest, SetDurationResponse
 from time import sleep
 import numpy as np
@@ -46,6 +47,7 @@ execTime = genpy.Duration()
 
 camImageNum = 0
 
+gazebo_model_state = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 
 def getObjectPointFromImage(camera):
     """"""
@@ -65,6 +67,9 @@ def updateObjectVelAndPose(camera):
     global targetPoint
 
     newTargetPoint = getObjectPointFromImage(camera)
+    gz_pose = gazebo_model_state.call(model_name="ball", relative_entity_name='')
+    newTargetPoint.header = gz_pose.header
+    newTargetPoint.point = gz_pose.pose.position
     if not (math.isnan(newTargetPoint.point.x) or math.isnan(newTargetPoint.point.y) or math.isnan(newTargetPoint.point.z)):
         diffTime = rospy.Time(secs=newTargetPoint.header.stamp.secs, nsecs=newTargetPoint.header.stamp.nsecs) - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
         if diffTime.to_sec() > 0.001:
@@ -148,19 +153,19 @@ def execTrajectoryPath():
 
     exec_traj2 = adjustSpeed(exec_traj2, speed)
 
-    if True:
-        trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
-        iiwa_group.set_start_state_to_current_state()
-        repeat = 0
-        while repeat < 10:
-            #rospy.logwarn("Executing fallback")
-            #rospy.logwarn(trajExecTime2)
-            curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.15)+rospy.Duration(0.005)*repeat))
-            exec_traj2 = iiwa_group.compute_cartesian_path([curTargetPose], 0.01, 0)[0]
-            if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
-                break
-            sleep(0.005)
-            repeat += 1
+    trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
+    iiwa_group.set_start_state_to_current_state()
+    repeat = 0
+    while repeat < 10:
+        curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.1)+rospy.Duration(0.005)*repeat))
+        if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x:
+            curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+
+        exec_traj2 = iiwa_group.compute_cartesian_path([curTargetPose], 0.01, 0)[0]
+        if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
+            break
+        sleep(0.005)
+        repeat += 1
 
     close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
     grasp_group.execute(close_traj)
@@ -168,29 +173,6 @@ def execTrajectoryPath():
     return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
     grasp_group.execute(return_traj)
     grasp_group.go(open_gripper_target)
-
-
-def execTrajectory():
-    """
-    Execute trajectory with the given index. Assumes the arm is at uppose, then moves it to a position above the
-    conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
-    opened again, releasing any object
-    """
-    global execTime
-    with targetPoseLock:
-        targetPose = computeTargetPose(execTime)
-
-    exec_traj = iiwa_group.plan(targetPose)
-    if len(exec_traj.joint_trajectory.points) > 0:
-        # Add time for gripper closing
-        speed = exec_traj.joint_trajectory.points[-1].time_from_start/(execTime-rospy.Duration(0.1))
-        exec_traj = adjustSpeed(exec_traj, speed)
-        iiwa_group.execute(exec_traj)
-        close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
-        grasp_group.execute(close_traj)
-        return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
-        grasp_group.execute(return_traj)
-        grasp_group.go(open_gripper_target)
 
 
 def adjustSpeed(old_traj, speed):
