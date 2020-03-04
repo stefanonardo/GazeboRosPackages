@@ -47,10 +47,11 @@ execTime = genpy.Duration()
 
 camImageNum = 0
 
+gzLock = Lock()
 gazebo_model_state = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 
 def getObjectPointFromImage(camera):
-    """"""
+    """Get Object Pose from camera image"""
     max_pix_value = 1.0
     normalizer = 255.0 / max_pix_value
     cam_img = CvBridge().imgmsg_to_cv2(camera, 'rgb8') / normalizer
@@ -64,10 +65,11 @@ def getObjectPointFromImage(camera):
 
 def updateObjectVelAndPose(camera):
     """Compute object velocity from two different objects"""
-    global targetPoint
+    global targetPoint, targetVel
 
     newTargetPoint = getObjectPointFromImage(camera)
-    gz_pose = gazebo_model_state.call(model_name="ball", relative_entity_name='')
+    with gzLock:
+        gz_pose = gazebo_model_state.call(model_name="ball", relative_entity_name='')
     newTargetPoint.header = gz_pose.header
     newTargetPoint.point = gz_pose.pose.position
     if not (math.isnan(newTargetPoint.point.x) or math.isnan(newTargetPoint.point.y) or math.isnan(newTargetPoint.point.z)):
@@ -82,6 +84,7 @@ def updateObjectVelAndPose(camera):
 
 
 def computeTargetPose(graspTime):
+    """Compute object position in the future, after a duration of graspTime"""
     global targetPoint, targetVel, targetPose
     futureTime = graspTime + rospy.Time.now() - rospy.Time(secs=targetPoint.header.stamp.secs, nsecs=targetPoint.header.stamp.nsecs)
     with velLock:
@@ -93,6 +96,7 @@ def computeTargetPose(graspTime):
     return targetPose
 
 def updateTargetPose(camera):
+    """Callback function for camera image subscriber. Will update velocity and pose every 5 frames"""
     global camImageNum
     if camImageNum < 5:
         camImageNum += 1
@@ -117,62 +121,71 @@ def execTrajectoryPath():
     conveyor. There, the gripper is closed, and the arm subsequently moved back up to uppose. Lastly, the gripper is
     opened again, releasing any object
     """
-    global execTime
-    with targetPoseLock:
-        targetPose = computeTargetPose(execTime)
-        curTargetPose = copy.deepcopy(targetPose)
+    global execTime, targetVel
+    try:
+        with gzLock:
+            curTargetPose = gazebo_model_state.call(model_name="ball", relative_entity_name='')
+    except rospy.ServiceException:
+        curTargetPose = None
 
-    if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x + 0.2:
-        curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+    # Local TF to arm position
+    curTargetVel = curTargetPose.twist.linear
+    curTargetPos = curTargetPose.pose
+    curTargetPos.position.x -= 1.0
+    curTargetPos.position.y -= -0.75
+    curTargetPos.position.z -= 0.8
 
-    prevTargetPose = copy.deepcopy(curTargetPose)
-    prevTargetPose.position.z += 0.10
+    targetTrajIndex = 0
+    targetTrajDist = abs(curTargetPos.position.y - downPoses[targetTrajIndex].position.y)
+    for i in range(1, len(downPoses)):
+        curDist = abs(curTargetPos.position.y - downPoses[i].position.y)
+        if curDist < targetTrajDist:
+            targetTrajIndex = i
+            targetTrajDist = curDist
 
-    iiwa_group.set_start_state_to_current_state()
-    exec_traj1 = iiwa_group.plan(prevTargetPose)
-    if len(exec_traj1.joint_trajectory.points) == 0:
-        return
+    if targetTrajDist > 0.05:
+        rospy.logwarn("Minimum Distance between object and gripper is too large: " + str(targetTrajDist) +
+                      "\nRecompute trajectories")
 
-    joint_state = JointState()
-    joint_state.header.stamp = rospy.Time.now()
-    joint_state.name = iiwa_group.get_active_joints()
-    joint_state.position = exec_traj1.joint_trajectory.points[-1].positions
-    joint_state.velocity = exec_traj1.joint_trajectory.points[-1].velocities
-    iiwa_group.set_start_state(RobotState(joint_state=joint_state))
-    exec_traj2 = iiwa_group.plan(curTargetPose)
+    targetTraj = adjustSpeed(downTrajectories[targetTrajIndex], downTrajectories[targetTrajIndex].joint_trajectory.points[-1].time_from_start / execTime)
+    iiwa_group.execute(targetTraj)
 
-    totalTrajExecTime = exec_traj1.joint_trajectory.points[-1].time_from_start + exec_traj2.joint_trajectory.points[-1].time_from_start
-    
-    # Add time for gripper closing
-    speed = totalTrajExecTime/(execTime-genpy.Duration(0.0))
-    exec_traj1 = adjustSpeed(exec_traj1, speed)
-    repeat = 0
-    while iiwa_group.execute(exec_traj1) is not True and repeat < 0:
-        repeat += 1
-        sleep(0.01)
+    gripperTraj = adjustSpeed(grasp_group.plan(close_gripper_target), grasp_speed)
+    startTime = rospy.Time.now()
+    try:
+        with gzLock:
+            curPoseMsg = gazebo_model_state.call(model_name="ball", relative_entity_name='')
+    except rospy.ServiceException:
+        curPoseMsg = None
 
-    exec_traj2 = adjustSpeed(exec_traj2, speed)
+    # Local TF to arm position
+    if curPoseMsg is not None:
+        curPoseMsg.pose.position.x -= 1.0
+        curPoseMsg.pose.position.y -= -0.75
+        curPoseMsg.pose.position.z -= 0.8
+    while curPoseMsg is not None and curPoseMsg.pose.position.x + curTargetVel.x*rospy.Duration(0.1).to_sec() < downPoses[trajectoryIndex].position.x:
+        # Wait at most 5 seconds for object, then move arm back to start position without trying to grasp
+        try:
+            with gzLock:
+                curPoseMsg = gazebo_model_state.call(model_name="ball", relative_entity_name='')
+        except rospy.ServiceException:
+            curPoseMsg = None
 
-    trajExecTime2 = exec_traj2.joint_trajectory.points[-1].time_from_start
-    iiwa_group.set_start_state_to_current_state()
-    repeat = 0
-    while repeat < 10:
-        curTargetPose = copy.deepcopy(computeTargetPose(trajExecTime2+rospy.Duration(0.1)+rospy.Duration(0.005)*repeat))
-        if curTargetPose.position.x < downPoses[trajectoryIndex].position.x - 0.2 or curTargetPose.position.x > downPoses[trajectoryIndex].position.x:
-            curTargetPose.position.x = downPoses[trajectoryIndex].position.x
+        if curPoseMsg is not None:
+            # Local TF to arm position
+            curPoseMsg.pose.position.x -= 1.0
+            curPoseMsg.pose.position.y -= -0.75
+            curPoseMsg.pose.position.z -= 0.8
 
-        exec_traj2 = iiwa_group.compute_cartesian_path([curTargetPose], 0.01, 0)[0]
-        if iiwa_group.execute(adjustSpeed(exec_traj2, exec_traj2.joint_trajectory.points[-1].time_from_start/trajExecTime2)) is True:
-            break
-        sleep(0.005)
-        repeat += 1
+        if rospy.Time.now() - startTime > rospy.Duration(secs=5):
+            iiwa_group.execute(adjustSpeed(iiwa_group.plan(upJointState), return_speed))
+            grasp_group.go(open_gripper_target)
+            return
 
-    close_traj = adjustSpeed(grasp_group.plan(close_gripper_target), speed)
-    grasp_group.execute(close_traj)
-    iiwa_group.set_start_state_to_current_state()
-    return_traj = adjustSpeed(iiwa_group.plan(upJointState), return_speed)
-    grasp_group.execute(return_traj)
+    grasp_group.execute(gripperTraj)
+    iiwa_group.execute(adjustSpeed(iiwa_group.plan(upJointState), return_speed))
     grasp_group.go(open_gripper_target)
+    return
 
 
 def adjustSpeed(old_traj, speed):
