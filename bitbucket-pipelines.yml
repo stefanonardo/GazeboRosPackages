@@ -10,5 +10,6 @@ pipelines:
     development:
     - step:
         name: Build
+        size: 2x
         script: # Modify the commands below to build your repository.
           - rm -rf build && catkin_make
