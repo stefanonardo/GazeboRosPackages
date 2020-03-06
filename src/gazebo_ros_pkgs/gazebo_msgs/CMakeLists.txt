@@ -31,6 +31,7 @@ add_message_files(
 add_service_files(DIRECTORY srv FILES
   ApplyBodyWrench.srv
   DeleteModel.srv
+  GetCameraImage.srv
   GetLinkState.srv
   GetPhysicsProperties.srv
   SetJointProperties.srv
