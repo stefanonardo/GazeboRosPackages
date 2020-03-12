@@ -3,6 +3,7 @@ project(gazebo_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
   std_msgs
+  nav_msgs
   trajectory_msgs
   geometry_msgs
   sensor_msgs
@@ -61,11 +62,16 @@ add_service_files(DIRECTORY srv FILES
   SetVisualProperties.srv
   SetSensorNoiseProperties.srv
   GetSensorNoiseProperties.srv
+  SetHuskyCmdVel.srv
+  GetHuskyOdometry.srv
+  GetHuskyJointStates.srv
+  SetHuskyWheelSpeeds.srv
   )
 
 generate_messages(DEPENDENCIES
   std_msgs
   geometry_msgs
+  nav_msgs
   sensor_msgs
   trajectory_msgs
   )
@@ -74,6 +80,7 @@ catkin_package(
   CATKIN_DEPENDS
   message_runtime
   std_msgs
+  nav_msgs
   trajectory_msgs
   geometry_msgs
   sensor_msgs
