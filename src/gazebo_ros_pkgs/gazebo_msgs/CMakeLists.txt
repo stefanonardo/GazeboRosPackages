@@ -35,11 +35,13 @@ add_service_files(DIRECTORY srv FILES
   GetCameraImage.srv
   GetLinkState.srv
   GetPhysicsProperties.srv
+  SetJointStates.srv
   SetJointProperties.srv
   SetModelConfiguration.srv
   SpawnEntity.srv
   ApplyJointEffort.srv
   GetJointProperties.srv
+  GetJointStates.srv
   GetModelProperties.srv
   GetWorldProperties.srv
   SetLinkProperties.srv
