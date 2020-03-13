@@ -1,0 +1,30 @@
+# ID of module
+int16 id
+# Current IBA step
+int16 step
+---
+# Module Lock state
+std_msgs/Bool lock
+# Individual module data arrays
+# This setup was chosen to allow easy access for users of the IBA
+float64[] m0
+float64[] m1
+float64[] m2
+float64[] m3
+float64[] m4
+float64[] m5
+float64[] m6
+float64[] m7
+float64[] m8
+float64[] m9
+float64[] m10
+float64[] m11
+float64[] m12
+float64[] m13
+float64[] m14
+float64[] m15
+float64[] m16
+float64[] m17
+float64[] m18
+float64[] m19
+float64[] m20
