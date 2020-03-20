@@ -3,17 +3,20 @@ import copy
 
 class TimeDelay:
     """
-    Time delay implemented as with a queue.
+    Time delay implemented as a queue.
+
     Parameters
     ----------
-    `delay`: Number of delay time steps (int)
+    `delay`: int
+        Number of delay time steps
 
-    `initial_value`: Initial value (object)
+    `initial_value`: object
+        Initial value. Can be any type of object.
     """
     def __init__(self, delay=5, initial_value=0):
         self.delay = delay
         self.Q = queue.Queue(delay)
-        for _ in range(0,delay):
+        for _ in range(0, delay):
             self.Q.put(copy.copy(initial_value))
         self.out = initial_value
 
@@ -36,7 +39,7 @@ if __name__ == "__main__":
         delay.step(val)
         print("u({}): {}, u({}): {}".format(k, val, k-T, delay.output))
 
-    # Test with data struct?
+    # Test with data struct
     print("With dict:")
     T = 5
     val = {'a': 5, 'b': 7}

@@ -8,38 +8,49 @@ from std_msgs.msg import Bool
 
 
 class IBAReactiveComponent(ExternalModule):
+    """ IBA module providing the reactive reflex.
+    
+        Receives object position (in image coordinates) and reacts within a predetermined window.
+        Sends a boolean trigger signal.
+    """
     def __init__(self, module_name=None, steps=1):
         super(IBAReactiveComponent, self).__init__(module_name, steps)
         self.steps = steps
 
     def initialize(self):
-        self.obj_min = 80 # could change it such that if it jumps from e.g 115 -> 85 it still gives a pulse..?
-        self.obj_max = 100 # old 90-110
-        self.US = False # None
+        # Triggering window
+        self.object_min = 80
+        self.object_max = 100
+
+        self.US = False # output signal. US: unconditioned stimuli
 
         rospy.Subscriber("/obj_pos", Point, self.obj_pos_callback)
         self.react_pub = rospy.Publisher('/reactive_trigger', Bool, queue_size=10)
+
         self.US_steps_left = 0
         self.had_US = False
 
     def run_step(self):
+        # Always publish state
         trig_msg = Bool()
         trig_msg.data = int(self.US)
         self.react_pub.publish(trig_msg)
 
-        if self.US: # trigger steps countdown
+        # Trigger steps countdown
+        if self.US:
             self.US_steps_left -= 1
             if self.US_steps_left == 0:
                 self.US = False
 
     def obj_pos_callback(self, msg):
+        """ ROS function callback. Detects when the object enters the window/zone. """
         obj_pos = msg.x
-        if not self.had_US and (obj_pos > self.obj_min and obj_pos < self.obj_max): # If object in zone and we're not already triggering
+        if not self.had_US and (obj_pos > self.object_min and obj_pos < self.object_max): # If object in zone and we're not already triggering
             self.US = True
-            self.US_steps_left = 10 # how many steps to trigger for
+            self.US_steps_left = 10 # how many CLE timesteps to trigger for
             self.had_US = True
         
-        if obj_pos > self.obj_max: # reset flag to allow detection in zone again
+        if obj_pos > self.object_max: # reset the flag to allow detection in zone again
             self.had_US = False
 
 

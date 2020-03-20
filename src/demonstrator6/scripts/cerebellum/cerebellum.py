@@ -4,6 +4,23 @@ from bases import MultiInputSecondOrderBases
 from utils import TimeDelay
 
 class Cerebellum:
+    """ Adaptive filter model of the cerebellum 
+    
+        Parameters
+        ----------
+        `dt`: float
+            Time step
+        `n_inputs`: int
+            Number of inputs to the cerebellar microcircuit
+        `n_bases`: int
+            Number of filters in each filter bank
+        `beta`: float
+            Learning rate.
+        `kc`: float
+            Strength of the NOI (nuclei-olivary inhibition)
+        `delta`: int
+            Delay between output and error signal given in units of `dt`.
+    """
     def __init__(self, dt, n_inputs, n_bases, beta, kc, delta):
         self.dt = dt
         self.beta = beta
@@ -28,15 +45,23 @@ class Cerebellum:
         self.p_delta = TimeDelay(delay=self.delta, initial_value=self.p.value)
 
     def step(self, CS, E):
-        # Gives p_r, p_d and p at time t
-
+        """ Step forward by time `dt`.
+            
+            Parameters
+            ----------
+            `CS`: numpy.ndarray
+                Contextual input (conditioned stimuli). Dimension `n_inputs`from constructor.
+            `E`: float
+                Error signal (uncoditioned stimuli).
+        """
         self.p.step(CS)
 
         # Update p time delay
         self.p_delta.step(self.p.value)
 
-        # Output of microcircuit
+        # Output of microcircuit. Linear combination of filter outputs, rectified to only give positive values.
         self.C = max(np.dot(self.p.value, self.weights), 0)
+
         # Update C time delay
         self.C_delta.step(self.C)
 
@@ -47,31 +72,57 @@ class Cerebellum:
         return self.C
 
     def _update_error_signal(self, E):
-        # IO not "spiking", just plain difference error
+        """ Computes the internal error signal. 
+
+            The error is added with the inhibition from the output (NOI).
+
+            Parameters
+            ----------
+            `E`: float
+                Single-valued error signal.
+        """
         self.internal_error = E - self.kc * self.C_delta.output
 
     def _update_weights(self, error):
+        """ Updates the weights of the cerebellum. 
+
+            Parameters
+            ----------
+            `error`: float
+                Single-valued internal error signal.
+        """
         self.weights += self.beta * error * self.p_delta.output
 
     @property
     def output(self):
+        """ Ouput signal. Single valued. """
         return self.C
 
     def import_state(self, data):
+        """ Imports a previously exported cerebellum model. Does not import the filter states. 
+        
+            Parameters
+            ----------
+            `data`: dict
+                A dictionary with the following keys:
+                    `weights`: numpy.ndarray
+                        asdad
+                    `tau_r`: numpy.ndarray
+                        First time constants of the filters in each bank. Dimension equal to number of filters in each bank.
+                    `tau_d`: numpy.ndarray
+                        First time constants of the filters in each bank. Dimension equal to `tau_r`.
+        """
         self.weights = data['weights']
         self.tau_r = data['tau_r']
         self.tau_d = data['tau_d']
         self.p = MultiInputSecondOrderBases(self.dt, self.n_inputs, self.tau_r, self.tau_d)
 
     def export_state(self):
+        """ Exports the current cerebellum model. See `import_state` for a description of the data. """
         return {'weights': self.weights, 'tau_r': self.tau_r, 'tau_d': self.tau_d}
 
 
-if __name__ == "__main__":
-    """     mc = MicroCircuit(J=10, beta=0.001)
-    print( mc.step(1, 0.2) )
-    for i in range(50):
-        print( mc.step(0, 0.2) ) """
+if __name__ == "__main__":"
     Ts = 1e-3
     c = Cerebellum(Ts, 2, 10, 0.001, 1, 20)
     print(c.step([1, 1], 0))
