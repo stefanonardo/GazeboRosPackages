@@ -177,7 +177,7 @@ def execTrajectoryPath():
             curPoseMsg.pose.position.y -= -0.75
             curPoseMsg.pose.position.z -= 0.8
 
-        if rospy.Time.now() - startTime > rospy.Duration(secs=5):
+        if rospy.Time.now() - startTime > rospy.Duration(secs=1):
             iiwa_group.execute(adjustSpeed(iiwa_group.plan(upJointState), return_speed))
             grasp_group.go(open_gripper_target)
             return
