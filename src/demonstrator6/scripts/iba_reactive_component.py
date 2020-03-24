@@ -19,10 +19,11 @@ class IBAReactiveComponent(ExternalModule):
 
     def initialize(self):
         # Triggering window
-        self.object_min = 80
-        self.object_max = 100
+        self.object_min = 95
+        self.object_max = 105
 
         self.US = False # output signal. US: unconditioned stimuli
+
 
         rospy.Subscriber("/obj_pos", Point, self.obj_pos_callback)
         self.react_pub = rospy.Publisher('/reactive_trigger', Bool, queue_size=10)

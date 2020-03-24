@@ -31,7 +31,8 @@ class IBACerebellum(ExternalModule):
         n_bases = 25 # Number of filters in the filterbank.
         beta = 2e-4 # Learning rate
         kc = 0.05 # Strength of the NOI (nuclei-olivary inhibition). Determines extinction time.
-        desired_delta = 650 # The required time between triggering and effective prevention of the US. In units of desired_Ts.
+        desired_delta = 500 # The required time between triggering and effective prevention of the US. In units of desired_Ts.
+
 
         self.CS = None
         self.US = 0

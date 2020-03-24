@@ -34,6 +34,9 @@ class IBAStatsCollector(ExternalModule):
         self.CR_obj_pos = None
 
         self.trials = []
+        self.save_file_num = 0
+        import time
+        self.timestr = time.strftime("%Y%m%d-%H%M%S")
 
         rospy.Subscriber("/gazebo/model_states", ModelStates, self.model_states_callback)
         rospy.Subscriber("/reactive_trigger", Bool, self.reactive_trigger_callback)
@@ -87,6 +90,9 @@ class IBAStatsCollector(ExternalModule):
                     self.obj_pos_px_vec = []
                     self.obj_pos_gt_vec = []
                     self.CR_obj_pos = None
+
+                    self.save_trials_cond()
+
                     rospy.loginfo("[Stats collector] Start of new trial: %d" % self.trial_num)
 
 
@@ -94,6 +100,19 @@ class IBAStatsCollector(ExternalModule):
 
         except ValueError:
             print("Obj not found")
+
+    def save_trials_cond(self):
+        save_trial_interval = 100
+        if len(self.trials) >= save_trial_interval:
+            self.save_trials()
+            
+
+    def save_trials(self):
+        import pickle
+        fname = rospkg.RosPack().get_path('demonstrator6') + '/scripts/resources/cerebellum_stats_' + self.timestr + '_' + str(self.save_file_num) + '.p'
+        pickle.dump(self.trials, open(fname, 'wb'))
+        self.trials = []
+        self.save_file_num += 1
 
     def adaptive_trigger_callback(self, msg):
         self.CR = msg.data
@@ -120,11 +139,7 @@ class IBAStatsCollector(ExternalModule):
         self.obj_pos_px_vec.append( ( (rospy.Time().now()-self.trial_start_time).to_sec(), self.obj_pos_px ) )
 
     def shutdown(self):
-        import pickle
-        import time
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        fname = rospkg.RosPack().get_path('demonstrator6') + '/scripts/resources/cerebellum_stats_' + timestr + '.p'
-        pickle.dump(self.trials, open(fname, 'wb'))
+        self.save_trials()
 
 if __name__ == "__main__":
 

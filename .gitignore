@@ -14,3 +14,4 @@ install/
 
 # Python compiled modules
 **.pyc
+*.p
