@@ -38,6 +38,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Pose.h>
+#include <gazebo_msgs/JointStates.h>
 
 #include <ros/ros.h>
 
@@ -45,6 +46,9 @@
 
 namespace gazebo
 {
+  // Constant Forces:
+  // Applies a constant force to given joints on each Update until cancelled
+  static std::map<std::string, double> constantJointForces;
 
 typedef std::map<std::string, physics::JointPtr> JointMap;
 
@@ -70,26 +74,43 @@ private:
   // get controller type from SDF
   std::string GetControllerType(const sdf::ElementPtr &sdf_ctrl_def);
 
-  // Create controller for parent model, keeping it on ground level without gravity influencing it
+  // Create controllers
   void CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for parent model rotation
   void CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for link pose
-  void CreateControllerLinkPose(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for link velocity
-  void CreateControllerLinkLinearVelocity(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerLinkPoseTarget(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerLinkPositionTarget(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllersLinkVelocities(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerAllJointsSetPosition(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerAllJointsPIDPositionTarget(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllersModelPoseTarget(const sdf::ElementPtr &sdf_elem_controller);
+  void CreateControllerConstantJointForces(const sdf::ElementPtr &sdf_elem_controller);
 
-  // Generic model rotation command callback function (ROS topic)
+  // ROS topic callbacks
   void ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg);
-  // Generic link pose command callback function (ROS topic)
-  void LinkPoseCB(const geometry_msgs::Pose::ConstPtr &msg, const physics::LinkPtr &link);
-  // Generic link velocity command callback function (ROS topic)
+  void LinkPoseTargetCB(const geometry_msgs::Pose::ConstPtr &msg, const physics::LinkPtr &link);
+  void LinkPositionTargetCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+  void LinkRotationTargetCB(const geometry_msgs::Quaternion::ConstPtr &msg, const physics::LinkPtr &link);
   void LinkLinearVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+  void LinkAngularVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+  void JointSetPositionCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+  void JointPIDPositionTargetCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+  void JointStatesPIDPositionTargetCB(const gazebo_msgs::JointStates::ConstPtr &msg);
+  void JointPIDParamCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+  void ModelPoseTargetCB(const geometry_msgs::Pose::ConstPtr &msg);
+  void ConstantJointForceCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+
+  // set link pose targets
+  void SetLinkPositionTarget(double x, double y, double z, const physics::LinkPtr &link);
+  void SetLinkRotationTarget(double w, double x, double y, double z, const physics::LinkPtr &link);
 
   // update link velocities based on pose target
-  void UpdateLinkVelocitiesFromPoseTargets(const physics::LinkPtr &link);
   void UpdateLinkLinearVelocityFromPositionTarget(const physics::LinkPtr &link);
   void UpdateLinkAngularVelocityFromRotationTarget(const physics::LinkPtr &link);
+
+  // update joint positions instantaneously from position targets
+  void UpdateJointPositionFromPositionTarget(const physics::JointPtr &joint);
+
+  void UpdateModelVelocitiesFromModelPoseTarget();
 
   // ROS node handle
   ros::NodeHandle node_handle_;
@@ -104,6 +125,12 @@ private:
   std::vector<ros::Subscriber> subscribers_model_rotation_;
   std::vector<ros::Subscriber> subscribers_link_pose_;
   std::vector<ros::Subscriber> subscribers_link_linear_velocity_;
+  std::vector<ros::Subscriber> subscribers_link_angular_velocity_;
+  std::vector<ros::Subscriber> subscribers_joint_set_position_;
+  std::vector<ros::Subscriber> subscribers_joint_pid_position_target_;
+  std::vector<ros::Subscriber> subscribers_joint_pid_params_;
+  std::vector<ros::Subscriber> subscribers_model_pose_target_;
+  std::vector<ros::Subscriber> subscribers_constant_joint_force_;
 
   /// \brief keep track of controller update sim-time.
   gazebo::common::Time last_update_time_;
@@ -118,8 +145,15 @@ private:
   float link_pos_target_diff_threshold_, link_rot_target_diff_threshold_;
   // saves parent model rotation updates from topics (applied during OnUpdate() )
   ignition::math::Quaterniond model_target_rotation_;
-  // pose targets for links
-  std::map<physics::LinkPtr, ignition::math::Pose3d> link_pose_targets_;
+  std::shared_ptr<ignition::math::Pose3d> model_target_pose_;
+  // position targets for links
+  std::map<physics::LinkPtr, ignition::math::Vector3d> link_position_targets_;
+  // rotation targets for links
+  std::map<physics::LinkPtr, ignition::math::Quaterniond> link_rotation_targets_;
+  // position targets for joints
+  //std::map<physics::JointPtr, double[3]> joint_position_targets_;
+
+  std::shared_ptr<physics::JointController> joint_controller_;
   
   // whether to keep the parent model positioned on ground
   bool keep_model_on_ground_;
