@@ -436,7 +436,7 @@ private:
 
   ros::ServiceServer spawn_sdf_entity_service_;
   ros::ServiceServer spawn_urdf_entity_service_;
-  ros::ServiceServer delete_model_service_;
+  // ros::ServiceServer delete_model_service_;    NRRPLT-7855
   ros::ServiceServer get_model_state_service_;
   ros::ServiceServer get_model_properties_service_;
   ros::ServiceServer get_world_properties_service_;
