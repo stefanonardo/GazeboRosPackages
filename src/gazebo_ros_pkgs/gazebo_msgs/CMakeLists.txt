@@ -27,7 +27,6 @@ add_message_files(
   JointStates.msg
   OpenSimPhysics.msg
   WheelSpeeds.msg
-  JointPositions.msg
   )
 
 add_service_files(DIRECTORY srv FILES
