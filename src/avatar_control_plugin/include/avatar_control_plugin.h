@@ -38,6 +38,7 @@
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Pose.h>
+#include <gazebo_msgs/JointStates.h>
 
 #include <ros/ros.h>
 
@@ -45,88 +46,123 @@
 
 namespace gazebo
 {
+  // Constant Forces:
+  // Applies a constant force to given joints on each Update until cancelled
+  static std::map<std::string, double> constantJointForces;
 
-typedef std::map<std::string, physics::JointPtr> JointMap;
+  typedef std::map<std::string, physics::JointPtr> JointMap;
 
-class AvatarControlPlugin : public ModelPlugin
-{
+  class AvatarControlPlugin : public ModelPlugin
+  {
 
-public:
+  public:
+    AvatarControlPlugin();
+    ~AvatarControlPlugin();
 
-  AvatarControlPlugin();
-  ~AvatarControlPlugin();
+    // Load the plugin and initilize all controllers
+    void Load(physics::ModelPtr parent, sdf::ElementPtr sdf);
 
-  // Load the plugin and initilize all controllers
-  void Load(physics::ModelPtr parent, sdf::ElementPtr sdf);
+    // Simulation update callback function
+    void OnUpdate(const common::UpdateInfo & /*_info*/);
 
-  // Simulation update callback function
-  void OnUpdate(const common::UpdateInfo & /*_info*/);
+  private:
+    // go through all controller elements in sdf and create controllers accordingly
+    void ParseControllers(const sdf::ElementPtr &sdf);
 
-private:
+    // get controller type from SDF
+    std::string GetControllerType(const sdf::ElementPtr &sdf_ctrl_def);
 
-  // go through all controller elements in sdf and create controllers accordingly
-  void ParseControllers(const sdf::ElementPtr &sdf);
+    // Create controllers
+    void CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerLinkPoseTarget(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerLinkPositionTarget(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllersLinkVelocities(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerAllJointsSetPosition(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerAllJointsPIDPositionTarget(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllersModelPoseTarget(const sdf::ElementPtr &sdf_elem_controller);
+    void CreateControllerConstantJointForces(const sdf::ElementPtr &sdf_elem_controller);
 
-  // get controller type from SDF
-  std::string GetControllerType(const sdf::ElementPtr &sdf_ctrl_def);
+    // ROS topic callbacks
+    void ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg);
+    void LinkPoseTargetCB(const geometry_msgs::Pose::ConstPtr &msg, const physics::LinkPtr &link);
+    void LinkPositionTargetCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+    void LinkRotationTargetCB(const geometry_msgs::Quaternion::ConstPtr &msg, const physics::LinkPtr &link);
+    void LinkLinearVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+    void LinkAngularVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+    void JointSetPositionCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+    void JointPIDPositionTargetCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+    void JointStatesPIDPositionTargetCB(const gazebo_msgs::JointStates::ConstPtr &msg);
+    void JointPIDParamCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
+    void ModelPoseTargetCB(const geometry_msgs::Pose::ConstPtr &msg);
+    void ConstantJointForceCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::JointPtr &joint);
 
-  // Create controller for parent model, keeping it on ground level without gravity influencing it
-  void CreateControllerModelPositionOnGround(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for parent model rotation
-  void CreateControllerModelRotation(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for link pose
-  void CreateControllerLinkPose(const sdf::ElementPtr &sdf_elem_controller);
-  // Create controller for link velocity
-  void CreateControllerLinkLinearVelocity(const sdf::ElementPtr &sdf_elem_controller);
+    // set link pose targets
+    void SetLinkPositionTarget(double x, double y, double z, const physics::LinkPtr &link);
+    void SetLinkRotationTarget(double w, double x, double y, double z, const physics::LinkPtr &link);
 
-  // Generic model rotation command callback function (ROS topic)
-  void ModelRotationCB(const geometry_msgs::Quaternion::ConstPtr &msg);
-  // Generic link pose command callback function (ROS topic)
-  void LinkPoseCB(const geometry_msgs::Pose::ConstPtr &msg, const physics::LinkPtr &link);
-  // Generic link velocity command callback function (ROS topic)
-  void LinkLinearVelocityCB(const geometry_msgs::Vector3::ConstPtr &msg, const physics::LinkPtr &link);
+    // update link velocities based on pose target
+    void UpdateLinkLinearVelocityFromPositionTarget(const physics::LinkPtr &link);
+    void UpdateLinkAngularVelocityFromRotationTarget(const physics::LinkPtr &link);
 
-  // update link velocities based on pose target
-  void UpdateLinkVelocitiesFromPoseTargets(const physics::LinkPtr &link);
-  void UpdateLinkLinearVelocityFromPositionTarget(const physics::LinkPtr &link);
-  void UpdateLinkAngularVelocityFromRotationTarget(const physics::LinkPtr &link);
+    // update joint positions instantaneously from position targets
+    void UpdateJointPositionFromPositionTarget(const physics::JointPtr &joint);
 
-  // ROS node handle
-  ros::NodeHandle node_handle_;
+    void UpdateModelVelocitiesFromModelPoseTarget();
 
-  // Pointer to the model
-  physics::ModelPtr model_;
+    void UpdateModelAngularVelocityFromModelRotationTarget();
 
-  // Pointer to the update event connection
-  event::ConnectionPtr eventconnection_update_world_;
+    void UpdateModelPositionOnGround();
 
-  // ROS subscribers
-  std::vector<ros::Subscriber> subscribers_model_rotation_;
-  std::vector<ros::Subscriber> subscribers_link_pose_;
-  std::vector<ros::Subscriber> subscribers_link_linear_velocity_;
+    // ROS node handle
+    ros::NodeHandle node_handle_;
 
-  /// \brief keep track of controller update sim-time.
-  gazebo::common::Time last_update_time_;
+    // Pointer to the model
+    physics::ModelPtr model_;
 
-  /// \brief Controller update mutex.
-  std::mutex mutex_;
+    // Pointer to the update event connection
+    event::ConnectionPtr eventconnection_update_world_;
 
-  float rotation_velocity_speed_factor_;
-  //TODO: general speed factors for link velocities
-  //TODO: maybe better to set as parameter on a per controller basis
-  float link_linear_velocity_speed_factor_, link_angular_velocity_speed_factor_;
-  float link_pos_target_diff_threshold_, link_rot_target_diff_threshold_;
-  // saves parent model rotation updates from topics (applied during OnUpdate() )
-  ignition::math::Quaterniond model_target_rotation_;
-  // pose targets for links
-  std::map<physics::LinkPtr, ignition::math::Pose3d> link_pose_targets_;
-  
-  // whether to keep the parent model positioned on ground
-  bool keep_model_on_ground_;
-  // determines ability to move up when recalculating parent model position on ground
-  float step_height_;
+    // ROS subscribers
+    std::vector<ros::Subscriber> subscribers_model_rotation_;
+    std::vector<ros::Subscriber> subscribers_link_pose_;
+    std::vector<ros::Subscriber> subscribers_link_linear_velocity_;
+    std::vector<ros::Subscriber> subscribers_link_angular_velocity_;
+    std::vector<ros::Subscriber> subscribers_joint_set_position_;
+    std::vector<ros::Subscriber> subscribers_joint_pid_position_target_;
+    std::vector<ros::Subscriber> subscribers_joint_pid_params_;
+    std::vector<ros::Subscriber> subscribers_model_pose_target_;
+    std::vector<ros::Subscriber> subscribers_constant_joint_force_;
 
-};
+    /// \brief keep track of controller update sim-time.
+    gazebo::common::Time last_update_time_;
+
+    /// \brief Controller update mutex.
+    std::mutex mutex_;
+
+    float rotation_velocity_speed_factor_;
+    //TODO: general speed factors for link velocities
+    //TODO: maybe better to set as parameter on a per controller basis
+    float link_linear_velocity_speed_factor_, link_angular_velocity_speed_factor_;
+    float link_pos_target_diff_threshold_, link_rot_target_diff_threshold_;
+    // saves parent model rotation updates from topics (applied during OnUpdate() )
+    ignition::math::Quaterniond model_target_rotation_;
+    std::shared_ptr<ignition::math::Pose3d> model_target_pose_;
+    physics::LinkPtr root_link_;
+    // position targets for links
+    std::map<physics::LinkPtr, ignition::math::Vector3d> link_position_targets_;
+    // rotation targets for links
+    std::map<physics::LinkPtr, ignition::math::Quaterniond> link_rotation_targets_;
+    // position targets for joints
+    //std::map<physics::JointPtr, double[3]> joint_position_targets_;
+
+    std::shared_ptr<physics::JointController> joint_controller_;
+
+    // whether to keep the parent model positioned on ground
+    bool keep_model_on_ground_;
+    // determines ability to move up when recalculating parent model position on ground
+    float step_height_;
+  };
 
 } // namespace gazebo
 

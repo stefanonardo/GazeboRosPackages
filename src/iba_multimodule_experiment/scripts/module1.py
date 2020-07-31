@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-""" """
+"""
+IBA Module example.
+This module will run four times during every CLE loop and will output a log message at every iteration.
+"""
 
 __author__ = 'Omer Yilmaz'
 
@@ -16,13 +19,14 @@ class Module1(ExternalModule):
     #     pass
     
     def run_step(self): 
-        pass
+        rospy.logwarn("Module 1 called")
 
     # def shutdown(self):
     #     pass
 
     def share_module_data(self):
         self.module_data = [1, 2.50, -3.7]
+
 
 if __name__ == "__main__":
     m = Module1(module_name='module1', steps=4)

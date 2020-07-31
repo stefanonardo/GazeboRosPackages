@@ -7,7 +7,7 @@ export COMP_WORDS=(${1})
 # load ros completion functions
 if [ -e "/opt/ros/melodic/share/rosbash/rosbash" ]
 then
-    . /opt/ros/kinetic/share/rosbash/rosbash
+    . /opt/ros/melodic/share/rosbash/rosbash
 else
     if [ -e "/opt/ros/kinetic/share/rosbash/rosbash" ]
     then

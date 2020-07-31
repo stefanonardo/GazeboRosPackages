@@ -245,14 +245,15 @@ void GazeboRosApiPlugin::advertiseServices()
                                                                    ros::VoidPtr(), &gazebo_queue_);
   spawn_urdf_entity_service_ = nh_->advertiseService(spawn_urdf_entity_aso);
 
+  // NRRPLT-7855
   // Advertise delete services on the custom queue
-  std::string delete_model_service_name("delete_model");
-  ros::AdvertiseServiceOptions delete_aso =
-    ros::AdvertiseServiceOptions::create<gazebo_msgs::DeleteModel>(
-                                                                   delete_model_service_name,
-                                                                   boost::bind(&GazeboRosApiPlugin::deleteModel,this,_1,_2),
-                                                                   ros::VoidPtr(), &gazebo_queue_);
-  delete_model_service_ = nh_->advertiseService(delete_aso);
+  // std::string delete_model_service_name("delete_model");
+  // ros::AdvertiseServiceOptions delete_aso =
+  //   ros::AdvertiseServiceOptions::create<gazebo_msgs::DeleteModel>(
+  //                                                                  delete_model_service_name,
+  //                                                                  boost::bind(&GazeboRosApiPlugin::deleteModel,this,_1,_2),
+  //                                                                  ros::VoidPtr(), &gazebo_queue_);
+  // delete_model_service_ = nh_->advertiseService(delete_aso);
 
   // Advertise more services on the custom queue
   std::string get_model_properties_service_name("get_model_properties");
